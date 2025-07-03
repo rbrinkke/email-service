@@ -1,0 +1,32 @@
+# File: Dockerfile.monitor
+# Email Monitoring Dashboard
+FROM python:3.11-slim
+
+WORKDIR /opt/email
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install fastapi uvicorn jinja2
+
+# Copy application code
+COPY email_system.py .
+COPY monitor.py .
+COPY templates/ templates/
+
+# Create logs directory
+RUN mkdir -p logs
+
+# Create non-root user
+RUN useradd -r -s /bin/false emailmonitor
+RUN chown -R emailmonitor:emailmonitor /opt/email
+USER emailmonitor
+
+EXPOSE 8011
+
+CMD ["uvicorn", "monitor:app", "--host", "0.0.0.0", "--port", "8011"]
