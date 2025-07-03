@@ -189,6 +189,10 @@ class RedisEmailClient:
                 delay = min(300, 10 * (2 ** job.retry_count))  # Max 5 minutes
                 retry_time = int(time.time() + delay)
                 
+                # Store the full job data for later retrieval by process_retry_queue
+                retry_job_key = f"email:retry:job:{job.job_id}"
+                await self.redis.set(retry_job_key, job.json(), ex=3600)  # 1 hour TTL for retry job data
+
                 await self.redis.zadd("email:retry", {job.job_id: retry_time})
                 await self.redis.xack(stream_key, "email_workers", job.stream_id)
                 await self.redis.xdel(stream_key, job.stream_id)
@@ -212,12 +216,33 @@ class RedisEmailClient:
         )
         
         for job_id, _ in retry_jobs:
-            # Remove from retry queue
-            await self.redis.zrem("email:retry", job_id)
+            retry_job_key = f"email:retry:job:{job_id}"
+            job_data_json = await self.redis.get(retry_job_key)
             
-            # Re-queue the job (would need job data stored separately)
-            # This is simplified - in production, store full job data
-            logging.info(f"Retrying job {job_id}")
+            if not job_data_json:
+                logging.warning(f"Retry job data not found for {job_id}, removing from retry queue.")
+                await self.redis.zrem("email:retry", job_id)
+                continue
+
+            try:
+                job_data = json.loads(job_data_json)
+                job = EmailJob.parse_obj(job_data)
+                job.status = EmailStatus.PENDING # Reset status for re-queueing
+                # job.retry_count is already incremented and stored with the job data.
+                # No need to increment it again here unless desired.
+
+                logging.info(f"Retrying job {job.job_id} (attempt {job.retry_count}) with priority {job.priority.value}")
+
+                # Re-enqueue the job
+                await self.enqueue_email(job)
+
+                # Clean up: remove from retry sorted set and delete the stored job data
+                await self.redis.zrem("email:retry", job_id)
+                await self.redis.delete(retry_job_key)
+                logging.info(f"Successfully re-queued job {job.job_id} for retry.")
+
+            except Exception as e:
+                logging.error(f"Error processing retry for job {job_id}: {e}. Job may remain in retry queue or data store.")
     
     async def get_stats(self) -> Dict:
         """Get email system statistics"""
