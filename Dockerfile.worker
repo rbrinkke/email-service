@@ -1,0 +1,29 @@
+# File: Dockerfile.worker
+# Email Worker Container
+FROM python:3.11-slim
+
+WORKDIR /opt/email
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY email_system.py .
+COPY worker.py .
+COPY templates/ templates/
+
+# Create logs directory
+RUN mkdir -p logs
+
+# Create non-root user
+RUN useradd -r -s /bin/false emailworker
+RUN chown -R emailworker:emailworker /opt/email
+USER emailworker
+
+CMD ["python", "worker.py"]
