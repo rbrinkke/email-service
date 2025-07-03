@@ -22,9 +22,8 @@
             margin: 0;
             font-size: 32px;
         }
-        .header p {
-            color: #7f8c8d;
-            margin: 10px 0 0 0;
+        .header .status {
+            margin: 10px 0;
         }
         .stats-grid {
             display: grid;
@@ -37,38 +36,25 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            border-left: 4px solid #3498db;
         }
         .stat-title {
             color: #666;
             font-size: 14px;
             margin-bottom: 5px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
         .stat-value {
             font-size: 28px;
             font-weight: bold;
             margin-bottom: 5px;
         }
-        .stat-value.success { color: #27ae60; }
-        .stat-value.warning { color: #f39c12; }
-        .stat-value.danger { color: #e74c3c; }
-        .stat-value.info { color: #3498db; }
-        
-        .queue-section {
-            margin-bottom: 30px;
-        }
-        .section-title {
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #2c3e50;
-        }
+        .stat-value.high { color: #e74c3c; }
+        .stat-value.medium { color: #f39c12; }
+        .stat-value.low { color: #27ae60; }
         .queue-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
         }
         .queue-card {
             background: white;
@@ -86,166 +72,131 @@
         .queue-card.low {
             border-top: 4px solid #27ae60;
         }
-        .queue-title {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-        }
-        .queue-count {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .queue-count.high { color: #e74c3c; }
-        .queue-count.medium { color: #f39c12; }
-        .queue-count.low { color: #27ae60; }
-        
-        .rate-limits {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        .rate-limit-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
             margin-bottom: 30px;
         }
-        .rate-limit-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .rate-limit-item:last-child {
-            border-bottom: none;
+        .rate-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .provider-name {
             font-weight: bold;
-            color: #2c3e50;
+            color: #333;
+            margin-bottom: 10px;
         }
-        .rate-info {
-            text-align: right;
-            color: #7f8c8d;
-            font-size: 14px;
-        }
-        .utilization-bar {
-            width: 100px;
-            height: 6px;
-            background: #ecf0f1;
-            border-radius: 3px;
+        .rate-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
             overflow: hidden;
-            margin-top: 5px;
+            margin: 5px 0;
         }
-        .utilization-fill {
+        .rate-fill {
             height: 100%;
-            background: #3498db;
+            background: linear-gradient(90deg, #27ae60, #f39c12, #e74c3c);
             transition: width 0.3s ease;
         }
-        .utilization-fill.high { background: #e74c3c; }
-        .utilization-fill.medium { background: #f39c12; }
-        
-        .refresh-info {
+        .last-updated {
             text-align: center;
-            color: #7f8c8d;
-            margin-top: 20px;
-            font-size: 14px;
-        }
-        .auto-refresh {
-            display: inline-block;
-            margin-left: 10px;
-            padding: 5px 10px;
-            background: #3498db;
-            color: white;
-            border-radius: 4px;
+            color: #666;
             font-size: 12px;
+            margin-top: 20px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-healthy { background: #27ae60; }
+        .status-warning { background: #f39c12; }
+        .status-critical { background: #e74c3c; }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
         }
     </style>
     <script>
         // Auto-refresh every 30 seconds
-        setTimeout(() => {
+        setInterval(() => {
             location.reload();
         }, 30000);
-        
-        // Real-time clock
-        function updateClock() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString();
-            document.getElementById('current-time').textContent = timeString;
-        }
-        
-        setInterval(updateClock, 1000);
-        updateClock();
     </script>
 </head>
 <body>
     <div class="header">
-        <h1>🚀 FreeFace Email System</h1>
-        <p>Real-time monitoring dashboard</p>
-        <div id="current-time"></div>
+        <h1>🚀 FreeFace Email System Monitor</h1>
+        <div class="status">
+            <span class="status-indicator status-healthy"></span>
+            System Operational
+        </div>
     </div>
-    
+
     <!-- Main Statistics -->
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-title">Total Queued</div>
-            <div class="stat-value info">{{ data.total_queued }}</div>
+            <div class="stat-value">{{ data.total_queued }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-title">Sent Today</div>
-            <div class="stat-value success">{{ data.sent_today }}</div>
+            <div class="stat-value low">{{ data.sent_today }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-title">Failed Today</div>
-            <div class="stat-value danger">{{ data.failed_today }}</div>
+            <div class="stat-value {% if data.failed_today > 0 %}high{% else %}low{% endif %}">{{ data.failed_today }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-title">Success Rate</div>
-            <div class="stat-value success">{{ data.success_rate }}</div>
+            <div class="stat-value">{{ data.success_rate }}</div>
         </div>
     </div>
-    
+
     <!-- Queue Status -->
-    <div class="queue-section">
-        <div class="section-title">📬 Queue Status</div>
-        <div class="queue-grid">
-            <div class="queue-card high">
-                <div class="queue-title">High Priority</div>
-                <div class="queue-count high">{{ data.queue_high }}</div>
-                <div style="font-size: 12px; color: #666;">Password resets, 2FA</div>
-            </div>
-            <div class="queue-card medium">
-                <div class="queue-title">Medium Priority</div>
-                <div class="queue-count medium">{{ data.queue_medium }}</div>
-                <div style="font-size: 12px; color: #666;">Invites, confirmations</div>
-            </div>
-            <div class="queue-card low">
-                <div class="queue-title">Low Priority</div>
-                <div class="queue-count low">{{ data.queue_low }}</div>
-                <div style="font-size: 12px; color: #666;">Newsletters, marketing</div>
-            </div>
+    <h2>📮 Queue Status</h2>
+    <div class="queue-grid">
+        <div class="queue-card high">
+            <h3>🚨 HIGH Priority</h3>
+            <div class="stat-value high">{{ data.queue_high }}</div>
+            <p>Password resets, 2FA codes</p>
+        </div>
+        <div class="queue-card medium">
+            <h3>📧 MEDIUM Priority</h3>
+            <div class="stat-value medium">{{ data.queue_medium }}</div>
+            <p>Group invites, confirmations</p>
+        </div>
+        <div class="queue-card low">
+            <h3>📰 LOW Priority</h3>
+            <div class="stat-value low">{{ data.queue_low }}</div>
+            <p>Newsletters, marketing</p>
         </div>
     </div>
-    
-    <!-- Rate Limits -->
-    <div class="rate-limits">
-        <div class="section-title">⚡ Rate Limits</div>
+
+    <!-- Rate Limiting Status -->
+    <h2>⚡ Rate Limiting Status</h2>
+    <div class="rate-limit-grid">
         {% for provider, status in data.rate_status.items() %}
-        <div class="rate-limit-item">
-            <div class="provider-name">{{ provider.title() }}</div>
-            <div class="rate-info">
-                <div>{{ status.tokens }} / {{ status.limit }} tokens</div>
-                <div class="utilization-bar">
-                    <div class="utilization-fill {% if status.utilization|replace('%', '')|float > 80 %}high{% elif status.utilization|replace('%', '')|float > 60 %}medium{% endif %}" 
-                         style="width: {{ status.utilization }}"></div>
-                </div>
-                <div style="margin-top: 2px;">{{ status.utilization }} used</div>
+        <div class="rate-card">
+            <div class="provider-name">{{ provider.upper() }}</div>
+            <div>Tokens: {{ status.tokens }} / {{ status.limit }}</div>
+            <div class="rate-bar">
+                <div class="rate-fill" style="width: {% if status.utilization != 'N/A' %}{{ status.utilization }}{% else %}0%{% endif %}"></div>
             </div>
+            <div>Usage: {{ status.utilization }}</div>
         </div>
         {% endfor %}
     </div>
-    
-    <div class="refresh-info">
+
+    <div class="last-updated">
         Last updated: {{ data.last_updated }}
-        <span class="auto-refresh">Auto-refresh: 30s</span>
+        <br>Auto-refresh every 30 seconds
     </div>
 </body>
 </html>
