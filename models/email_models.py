@@ -35,12 +35,13 @@ class EmailJob(BaseModel):
     template: str
     data: Dict = Field(default_factory=dict)
     priority: EmailPriority = EmailPriority.MEDIUM
-    provider: EmailProvider = EmailProvider.SENDGRID
+    provider: EmailProvider = EmailProvider.SMTP
     status: EmailStatus = EmailStatus.PENDING
     created_at: datetime = Field(default_factory=datetime.utcnow)
     scheduled_at: Optional[datetime] = None
     retry_count: int = 0
     error_message: Optional[str] = None
+    stream_id: Optional[str] = None  # Redis stream message ID
     
     @validator('to')
     def validate_recipients(cls, v):

@@ -1,7 +1,17 @@
-# docker-compose.yml - Complete FreeFace Email System
 version: '3.8'
 
 services:
+  # Mailhog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: freeface-mailhog
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI
+    networks:
+      - email_network
+    restart: unless-stopped
+
   # Redis for email queues and rate limiting
   redis-email:
     image: redis:7-alpine
@@ -21,26 +31,26 @@ services:
     networks:
       - email_network
 
-  # Email Workers (multiple instances for scaling)
+  # Email Workers
   email-worker-1:
     build: 
       context: .
       dockerfile: Dockerfile.worker
     container_name: freeface-email-worker-1
     environment:
-      - WORKER_ID=worker_1
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - WORKER_CONCURRENCY=100
-      - BATCH_SIZE=50
-      - LOG_LEVEL=INFO
-    volumes:
-      - ./templates:/opt/email/templates:ro
-      - ./logs:/opt/email/logs
+      - WORKER_ID=worker-1
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
     networks:
       - email_network
 
@@ -50,19 +60,19 @@ services:
       dockerfile: Dockerfile.worker
     container_name: freeface-email-worker-2
     environment:
-      - WORKER_ID=worker_2
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - WORKER_CONCURRENCY=100
-      - BATCH_SIZE=50
-      - LOG_LEVEL=INFO
-    volumes:
-      - ./templates:/opt/email/templates:ro
-      - ./logs:/opt/email/logs
+      - WORKER_ID=worker-2
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
     networks:
       - email_network
 
@@ -72,25 +82,25 @@ services:
       dockerfile: Dockerfile.worker
     container_name: freeface-email-worker-3
     environment:
-      - WORKER_ID=worker_3
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - WORKER_CONCURRENCY=100
-      - BATCH_SIZE=50
-      - LOG_LEVEL=INFO
-    volumes:
-      - ./templates:/opt/email/templates:ro
-      - ./logs:/opt/email/logs
+      - WORKER_ID=worker-3
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
     networks:
       - email_network
 
   # Email API Service
   email-api:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.api
     container_name: freeface-email-api
@@ -99,22 +109,27 @@ services:
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - API_HOST=0.0.0.0
-      - API_PORT=8010
-      - LOG_LEVEL=INFO
-    volumes:
-      - ./templates:/opt/email/templates:ro
-      - ./logs:/opt/email/logs
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
     networks:
       - email_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Monitoring and Management Dashboard
+  # Monitoring Dashboard
   email-monitor:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.monitor
     container_name: freeface-email-monitor
@@ -123,30 +138,35 @@ services:
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - MONITOR_PORT=8011
-    volumes:
-      - ./logs:/opt/email/logs:ro
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
     networks:
       - email_network
 
-  # Schedule Processor (for scheduled emails)
+  # Scheduler Service
   email-scheduler:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.scheduler
     container_name: freeface-email-scheduler
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - SCHEDULE_INTERVAL=60
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
     networks:
       - email_network
 
@@ -157,185 +177,6 @@ volumes:
 networks:
   email_network:
     driver: bridge
-
----
-
-# Dockerfile.worker - Email Worker Container
-FROM python:3.11-slim
-
-WORKDIR /opt/email
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY email_system.py .
-COPY worker.py .
-COPY templates/ templates/
-
-# Create logs directory
-RUN mkdir -p logs
-
-# Create non-root user
-RUN useradd -r -s /bin/false emailworker
-RUN chown -R emailworker:emailworker /opt/email
-USER emailworker
-
-CMD ["python", "worker.py"]
-
----
-
-# Dockerfile.api - Email API Container
-FROM python:3.11-slim
-
-WORKDIR /opt/email
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install fastapi uvicorn
-
-# Copy application code
-COPY email_system.py .
-COPY api.py .
-COPY templates/ templates/
-
-# Create logs directory
-RUN mkdir -p logs
-
-# Create non-root user
-RUN useradd -r -s /bin/false emailapi
-RUN chown -R emailapi:emailapi /opt/email
-USER emailapi
-
-EXPOSE 8010
-
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8010", "--workers", "4"]
-
----
-
-# Dockerfile.monitor - Email Monitoring Dashboard
-FROM python:3.11-slim
-
-WORKDIR /opt/email
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install fastapi uvicorn jinja2
-
-# Copy application code
-COPY email_system.py .
-COPY monitor.py .
-COPY templates/ templates/
-
-# Create logs directory
-RUN mkdir -p logs
-
-# Create non-root user
-RUN useradd -r -s /bin/false emailmonitor
-RUN chown -R emailmonitor:emailmonitor /opt/email
-USER emailmonitor
-
-EXPOSE 8011
-
-CMD ["uvicorn", "monitor:app", "--host", "0.0.0.0", "--port", "8011"]
-
----
-
-# Dockerfile.scheduler - Email Scheduler
-FROM python:3.11-slim
-
-WORKDIR /opt/email
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY email_system.py .
-COPY scheduler.py .
-
-# Create logs directory
-RUN mkdir -p logs
-
-# Create non-root user
-RUN useradd -r -s /bin/false emailscheduler
-RUN chown -R emailscheduler:emailscheduler /opt/email
-USER emailscheduler
-
-CMD ["python", "scheduler.py"]
-
----
-
-# requirements.txt
-redis[hiredis]==5.0.1
-aiohttp==3.9.1
-aiosmtplib==3.0.1
-jinja2==3.1.2
-pydantic==2.5.2
-backoff==2.2.1
-python-multipart==0.0.6
-uvicorn[standard]==0.24.0
-fastapi==0.104.1
-
----
-
-# redis.conf - Optimized Redis Configuration for Email
-# Memory and persistence settings
-maxmemory 2gb
-maxmemory-policy allkeys-lru
-
-# Persistence for email queue reliability
-save 900 1
-save 300 10
-save 60 10000
-
-# AOF for durability
-appendonly yes
-appendfsync everysec
-auto-aof-rewrite-percentage 100
-auto-aof-rewrite-min-size 64mb
-
-# Networking
-tcp-keepalive 300
-timeout 0
-
-# Performance optimizations
-tcp-backlog 511
-databases 16
-stop-writes-on-bgsave-error yes
-
-# Logging
-loglevel notice
-syslog-enabled yes
-syslog-ident redis-email
-
-# Security
-bind 0.0.0.0
-protected-mode yes
-
-# Stream settings for email queues
-stream-node-max-bytes 4096
-stream-node-max-entries 100
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -9,8 +9,8 @@ import aiohttp
 import backoff
 
 from .base_provider import EmailProviderBase
-from ..models.email_models import EmailJob
-from ..redis.redis_client import RedisEmailClient
+from models.email_models import EmailJob
+from redis_client_lib.redis_client import RedisEmailClient
 
 class SendGridProvider(EmailProviderBase):
     """SendGrid email provider using HTTP API"""

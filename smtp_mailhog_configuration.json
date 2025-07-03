@@ -1,0 +1,290 @@
+{
+  "email_system_smtp_configuration": {
+    "overview": {
+      "purpose": "Configure FreeFace Email System to use SMTP as primary provider with Mailhog for testing",
+      "changes_summary": "Modified default provider from SendGrid to SMTP, configured Mailhog integration, added environment variable support",
+      "testing_tool": "Mailhog - captures all SMTP emails for testing without sending real emails"
+    },
+    
+    "configuration_changes": {
+      "files_modified": [
+        {
+          "file": "/opt/freeface/email-service/models/email_models.py",
+          "line": 38,
+          "change": "Changed default provider from EmailProvider.SENDGRID to EmailProvider.SMTP",
+          "before": "provider: EmailProvider = EmailProvider.SENDGRID",
+          "after": "provider: EmailProvider = EmailProvider.SMTP"
+        },
+        {
+          "file": "/opt/freeface/email-service/services/email_service.py",
+          "line": 34,
+          "change": "Changed default provider parameter in send_email method",
+          "before": "provider: EmailProvider = EmailProvider.SENDGRID",
+          "after": "provider: EmailProvider = EmailProvider.SMTP"
+        },
+        {
+          "file": "/opt/freeface/email-service/api.py",
+          "line": 41,
+          "change": "Changed default provider in API request model",
+          "before": "provider: EmailProvider = EmailProvider.SENDGRID",
+          "after": "provider: EmailProvider = EmailProvider.SMTP"
+        },
+        {
+          "file": "/opt/freeface/email-service/config/email_config.py",
+          "lines": "54-61",
+          "change": "Updated SMTP configuration to use Mailhog and environment variables",
+          "configuration": {
+            "host": "os.getenv('SMTP_HOST', 'mailhog')",
+            "port": "os.getenv('SMTP_PORT', '1025')",
+            "username": "os.getenv('SMTP_USERNAME', 'test@example.com')",
+            "password": "os.getenv('SMTP_PASSWORD', 'test_smtp_password')",
+            "from_email": "os.getenv('SMTP_FROM_EMAIL', 'noreply@freeface.com')",
+            "use_tls": "os.getenv('SMTP_USE_TLS', 'false')"
+          }
+        },
+        {
+          "file": "/opt/freeface/email-service/providers/smtp_provider.py",
+          "changes": [
+            {
+              "type": "tls_configuration",
+              "description": "Added dynamic TLS configuration based on config",
+              "code": "use_tls = self.config.get('use_tls', 'true').lower() == 'true'"
+            },
+            {
+              "type": "authentication",
+              "description": "Made authentication optional for Mailhog",
+              "code": "if self.config.get('username') and self.config.get('password'):\n    await smtp.login(self.config['username'], self.config['password'])"
+            },
+            {
+              "type": "template_rendering",
+              "description": "Fixed template rendering with proper file loader",
+              "code": "template = self.template_env.get_template(f'{job.template}.html')"
+            }
+          ]
+        }
+      ]
+    },
+    
+    "mailhog_configuration": {
+      "docker_service": {
+        "image": "mailhog/mailhog:latest",
+        "container_name": "freeface-mailhog",
+        "ports": {
+          "smtp": "1025:1025",
+          "web_ui": "8025:8025"
+        },
+        "network": "email_network"
+      },
+      "access_points": {
+        "smtp_server": "localhost:1025 or mailhog:1025 (within Docker network)",
+        "web_interface": "http://localhost:8025",
+        "api_endpoint": "http://localhost:8025/api/v2/messages"
+      }
+    },
+    
+    "environment_variables": {
+      "description": "Environment variables for SMTP configuration",
+      "variables": {
+        "SMTP_HOST": {
+          "default": "mailhog",
+          "description": "SMTP server hostname",
+          "docker_value": "mailhog",
+          "local_value": "localhost"
+        },
+        "SMTP_PORT": {
+          "default": "1025",
+          "description": "SMTP server port"
+        },
+        "SMTP_USERNAME": {
+          "default": "test@example.com",
+          "description": "SMTP authentication username (optional for Mailhog)"
+        },
+        "SMTP_PASSWORD": {
+          "default": "test_smtp_password",
+          "description": "SMTP authentication password (optional for Mailhog)"
+        },
+        "SMTP_USE_TLS": {
+          "default": "false",
+          "description": "Whether to use TLS/STARTTLS (false for Mailhog)"
+        },
+        "SMTP_FROM_EMAIL": {
+          "default": "noreply@freeface.com",
+          "description": "Default sender email address"
+        }
+      }
+    },
+    
+    "testing_instructions": {
+      "step_by_step": [
+        {
+          "step": 1,
+          "action": "Start Mailhog container",
+          "command": "docker-compose up -d mailhog",
+          "verification": "Check http://localhost:8025 opens Mailhog web UI"
+        },
+        {
+          "step": 2,
+          "action": "Start Redis container",
+          "command": "docker-compose up -d redis-email",
+          "verification": "Redis health check passes"
+        },
+        {
+          "step": 3,
+          "action": "Build and start email services",
+          "command": "docker-compose up -d --build",
+          "services": ["email-api", "email-worker-1", "email-worker-2", "email-worker-3", "email-scheduler", "email-monitor"]
+        },
+        {
+          "step": 4,
+          "action": "Run test script",
+          "command": "python test_full_email_flow.py",
+          "expected_output": "Emails appear in Mailhog web UI"
+        },
+        {
+          "step": 5,
+          "action": "Send test email via API",
+          "command": "curl -X POST http://localhost:8010/send -H 'Content-Type: application/json' -d '{\"recipients\": \"test@example.com\", \"template\": \"test_email\", \"data\": {\"subject\": \"API Test\", \"message\": \"Test from API\"}}'",
+          "expected_response": "{\"job_id\": \"...\", \"status\": \"queued\", \"message\": \"Email successfully queued for delivery\"}"
+        }
+      ]
+    },
+    
+    "api_endpoints": {
+      "send_email": {
+        "url": "POST /send",
+        "description": "Send email with SMTP as default provider",
+        "request_body": {
+          "recipients": "string or array of email addresses",
+          "template": "template name without .html extension",
+          "data": "template variables object",
+          "priority": "high|medium|low (optional, default: medium)",
+          "provider": "smtp|sendgrid|mailgun|aws_ses (optional, default: smtp)",
+          "scheduled_at": "ISO datetime for scheduled sending (optional)"
+        },
+        "example": {
+          "recipients": "user@example.com",
+          "template": "user_welcome",
+          "data": {
+            "name": "John Doe",
+            "verification_link": "https://freeface.com/verify/abc123"
+          },
+          "priority": "high"
+        }
+      },
+      "stats": {
+        "url": "GET /stats",
+        "description": "Get email system statistics"
+      },
+      "health": {
+        "url": "GET /health",
+        "description": "Health check endpoint"
+      }
+    },
+    
+    "available_templates": {
+      "test_email": {
+        "description": "Simple test email template",
+        "variables": ["subject", "message", "name"]
+      },
+      "user_welcome": {
+        "description": "New user welcome email",
+        "variables": ["name", "verification_link"]
+      },
+      "password_reset": {
+        "description": "Password reset request",
+        "variables": ["reset_link"]
+      },
+      "group_invitation": {
+        "description": "Group invitation email",
+        "variables": ["inviter", "group_name", "description", "when", "where", "member_count", "join_link"]
+      },
+      "new_message": {
+        "description": "New message notification",
+        "variables": ["sender", "group_name", "preview", "group_link", "unsubscribe_link"]
+      },
+      "weekly_digest": {
+        "description": "Weekly activity digest",
+        "variables": ["highlights", "new_groups", "active_groups", "unsubscribe_link", "preferences_link"]
+      }
+    },
+    
+    "troubleshooting": {
+      "common_issues": [
+        {
+          "issue": "Emails not appearing in Mailhog",
+          "possible_causes": [
+            "Mailhog container not running",
+            "Wrong SMTP_HOST configuration",
+            "Workers not processing emails",
+            "Redis connection issues"
+          ],
+          "debugging_steps": [
+            "Check Mailhog container: docker ps | grep mailhog",
+            "Check worker logs: docker logs freeface-email-worker-1",
+            "Verify Redis connection: docker exec -it freeface-email-redis redis-cli ping",
+            "Check email queue: python debug_queue.py"
+          ]
+        },
+        {
+          "issue": "SMTP connection errors",
+          "possible_causes": [
+            "TLS enabled when it shouldn't be",
+            "Wrong port configuration",
+            "Network connectivity issues"
+          ],
+          "solutions": [
+            "Ensure SMTP_USE_TLS=false for Mailhog",
+            "Verify SMTP_PORT=1025",
+            "Check Docker network: docker network ls"
+          ]
+        },
+        {
+          "issue": "Template not found errors",
+          "possible_causes": [
+            "Template directory doesn't exist",
+            "Template name mismatch",
+            "Missing .html extension in template files"
+          ],
+          "solutions": [
+            "Create template directory: mkdir -p /opt/freeface/email/templates",
+            "Run email_templates.py to create default templates",
+            "Use template name without .html extension in API calls"
+          ]
+        }
+      ]
+    },
+    
+    "monitoring": {
+      "dashboard": {
+        "url": "http://localhost:8011",
+        "description": "Email system monitoring dashboard",
+        "metrics": ["queue sizes", "processing rates", "success/failure counts"]
+      },
+      "logs": {
+        "api_logs": "/opt/freeface/email-service/logs/api.log",
+        "worker_logs": "/opt/freeface/email-service/logs/worker.log",
+        "container_logs": "docker logs <container_name>"
+      }
+    },
+    
+    "production_considerations": {
+      "switching_providers": {
+        "description": "To switch back to production email providers",
+        "steps": [
+          "Update default provider in email_models.py, email_service.py, and api.py",
+          "Set appropriate API keys in environment variables",
+          "Update rate limits in email_config.py",
+          "Test with production provider before deploying"
+        ]
+      },
+      "security": {
+        "recommendations": [
+          "Never commit real API keys to version control",
+          "Use environment variables for sensitive configuration",
+          "Implement proper authentication for API endpoints",
+          "Monitor failed email attempts"
+        ]
+      }
+    }
+  }
+}

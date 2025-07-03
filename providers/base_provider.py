@@ -3,9 +3,9 @@
 # Base class for all email providers with circuit breaker protection
 
 from typing import Dict
-from ..workers.circuit_breaker import CircuitBreaker
-from ..models.email_models import EmailJob
-from ..redis.redis_client import RedisEmailClient
+from workers.circuit_breaker import CircuitBreaker
+from models.email_models import EmailJob
+from redis_client_lib.redis_client import RedisEmailClient
 
 class EmailProviderBase:
     """Base class for email providers"""

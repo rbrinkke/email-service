@@ -8,28 +8,28 @@ import time
 import logging
 from typing import Dict, List, Optional
 
-import redis.asyncio as redis
+import redis
+from .async_redis_wrapper import AsyncRedisWrapper
 
-from ..config.email_config import EmailConfig
-from ..models.email_models import EmailJob, EmailPriority, EmailStatus
+from config.email_config import EmailConfig
+from models.email_models import EmailJob, EmailPriority, EmailStatus
 
 class RedisEmailClient:
     """Advanced Redis client for email operations using Streams and Lua scripts"""
     
     def __init__(self, config: EmailConfig):
         self.config = config
-        self.redis: Optional[redis.Redis] = None
+        self.redis = None
         self._lua_scripts = {}
         
     async def connect(self):
         """Initialize Redis connection and load Lua scripts"""
-        self.redis = redis.Redis(
+        self.redis = AsyncRedisWrapper(
             host=self.config.redis_host,
             port=self.config.redis_port,
             db=self.config.redis_db,
             password=self.config.redis_password,
-            decode_responses=True,
-            retry_on_timeout=True
+            decode_responses=True
         )
         
         # Load Lua scripts for atomic operations

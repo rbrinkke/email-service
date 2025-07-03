@@ -41,6 +41,7 @@ class EmailJob(BaseModel):
     scheduled_at: Optional[datetime] = None
     retry_count: int = 0
     error_message: Optional[str] = None
+    stream_id: Optional[str] = None  # Redis stream message ID
     
     @validator('to')
     def validate_recipients(cls, v):

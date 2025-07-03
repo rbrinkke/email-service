@@ -7,10 +7,10 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
 
-from ..config.email_config import EmailConfig
-from ..models.email_models import EmailJob, EmailPriority, EmailProvider
-from ..redis.redis_client import RedisEmailClient
-from ..workers.email_worker import EmailWorker
+from config.email_config import EmailConfig
+from models.email_models import EmailJob, EmailPriority, EmailProvider
+from redis_client_lib.redis_client import RedisEmailClient
+from workers.email_worker import EmailWorker
 
 class EmailService:
     """Main email service interface"""
@@ -31,7 +31,7 @@ class EmailService:
         template: str,
         data: Dict = None,
         priority: EmailPriority = EmailPriority.MEDIUM,
-        provider: EmailProvider = EmailProvider.SENDGRID,
+        provider: EmailProvider = EmailProvider.SMTP,
         scheduled_at: Optional[datetime] = None
     ) -> str:
         """
@@ -104,6 +104,7 @@ class EmailService:
             worker = EmailWorker(f"worker_{i}", self.config, self.redis_client)
             task = asyncio.create_task(worker.start())
             self.workers.append((worker, task))
+            logging.info(f"Created worker task for worker_{i}")
         
         logging.info(f"Started {worker_count} email workers")
     

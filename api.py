@@ -38,7 +38,7 @@ class EmailRequest(BaseModel):
     template: str
     data: Dict = {}
     priority: EmailPriority = EmailPriority.MEDIUM
-    provider: EmailProvider = EmailProvider.SENDGRID
+    provider: EmailProvider = EmailProvider.SMTP
     scheduled_at: Optional[datetime] = None
 
 class EmailResponse(BaseModel):

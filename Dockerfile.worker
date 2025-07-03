@@ -16,6 +16,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY email_system.py .
 COPY worker.py .
+COPY email_templates.py .
+COPY config/ config/
+COPY models/ models/
+COPY providers/ providers/
+COPY redis_client_lib/ redis_client_lib/
+COPY services/ services/
+COPY workers/ workers/
 COPY templates/ templates/
 
 # Create logs directory

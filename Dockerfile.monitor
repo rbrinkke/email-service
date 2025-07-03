@@ -17,6 +17,13 @@ RUN pip install fastapi uvicorn jinja2
 # Copy application code
 COPY email_system.py .
 COPY monitor.py .
+COPY email_templates.py .
+COPY config/ config/
+COPY models/ models/
+COPY providers/ providers/
+COPY redis_client_lib/ redis_client_lib/
+COPY services/ services/
+COPY workers/ workers/
 COPY templates/ templates/
 
 # Create logs directory

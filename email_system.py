@@ -8,7 +8,7 @@
 # Re-export all the main classes for the containerized services
 from config.email_config import EmailConfig
 from models.email_models import EmailJob, EmailPriority, EmailProvider, EmailStatus
-from redis.redis_client import RedisEmailClient
+from redis_client_lib.redis_client import RedisEmailClient
 from services.email_service import EmailService
 from services.freeface_integration import FreeFaceEmailIntegration
 from workers.email_worker import EmailWorker

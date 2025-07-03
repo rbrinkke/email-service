@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>You're Invited to Join {{ group_name }}!</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #2196F3; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .button { 
+            display: inline-block; 
+            background: #2196F3; 
+            color: white; 
+            padding: 12px 24px; 
+            text-decoration: none; 
+            border-radius: 4px; 
+            margin: 10px 0;
+        }
+        .activity-details { background: white; padding: 15px; border-radius: 4px; margin: 15px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>You're Invited!</h1>
+        </div>
+        <div class="content">
+            <h2>{{ inviter }} invited you to join:</h2>
+            <div class="activity-details">
+                <h3>{{ group_name }}</h3>
+                {% if description %}
+                <p>{{ description }}</p>
+                {% endif %}
+                {% if when %}
+                <p><strong>When:</strong> {{ when }}</p>
+                {% endif %}
+                {% if where %}
+                <p><strong>Where:</strong> {{ where }}</p>
+                {% endif %}
+                {% if member_count %}
+                <p><strong>Members:</strong> {{ member_count }} people</p>
+                {% endif %}
+            </div>
+            
+            <p>Ready to join the fun?</p>
+            
+            <a href="{{ join_link }}" class="button">Join Group</a>
+            
+            <p><small>Not interested? You can safely ignore this invitation.</small></p>
+        </div>
+        <div class="footer">
+            <p>FreeFace - Where activities become friendships</p>
+        </div>
+    </div>
+</body>
+</html>

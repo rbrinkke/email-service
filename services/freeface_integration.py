@@ -2,7 +2,7 @@
 # FreeFace Email System - FreeFace Integration
 # Integration layer for FreeFace APIs
 
-from ..models.email_models import EmailPriority
+from models.email_models import EmailPriority
 from .email_service import EmailService
 
 class FreeFaceEmailIntegration:

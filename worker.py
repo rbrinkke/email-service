@@ -12,7 +12,6 @@ logging.basicConfig(
     level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO')),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/opt/email/logs/worker.log'),
         logging.StreamHandler()
     ]
 )

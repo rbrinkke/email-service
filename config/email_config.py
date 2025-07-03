@@ -4,12 +4,13 @@
 
 from dataclasses import dataclass
 from typing import Dict, Optional
+import os
 
 @dataclass
 class EmailConfig:
     """Complete email system configuration"""
     # Redis Configuration
-    redis_host: str = "10.10.1.21"
+    redis_host: str = "redis-email"
     redis_port: int = 6379
     redis_db: int = 0
     redis_password: Optional[str] = None
@@ -27,7 +28,7 @@ class EmailConfig:
     dead_letter_ttl: int = 86400 * 7  # 7 days
     
     # Templates
-    template_directory: str = "/opt/freeface/email/templates"
+    template_directory: str = "/opt/email/templates"
     
     def __post_init__(self):
         if self.rate_limits is None:
@@ -52,10 +53,11 @@ class EmailConfig:
                     "api_url": "https://api.mailgun.net/v3"
                 },
                 "smtp": {
-                    "host": "smtp.gmail.com",
-                    "port": "587",
-                    "username": "noreply@freeface.com",
-                    "password": "app_password",
-                    "from_email": "noreply@freeface.com"
+                    "host": os.getenv('SMTP_HOST', 'mailhog'),
+                    "port": os.getenv('SMTP_PORT', '1025'),
+                    "username": os.getenv('SMTP_USERNAME', 'test@example.com'),
+                    "password": os.getenv('SMTP_PASSWORD', 'test_smtp_password'),
+                    "from_email": os.getenv('SMTP_FROM_EMAIL', 'noreply@freeface.com'),
+                    "use_tls": os.getenv('SMTP_USE_TLS', 'false')
                 }
             }

@@ -7,11 +7,11 @@ import logging
 from datetime import datetime
 from typing import Dict
 
-from ..config.email_config import EmailConfig
-from ..models.email_models import EmailJob, EmailStatus
-from ..redis.redis_client import RedisEmailClient
-from ..providers.sendgrid_provider import SendGridProvider
-from ..providers.smtp_provider import SMTPProvider
+from config.email_config import EmailConfig
+from models.email_models import EmailJob, EmailStatus
+from redis_client_lib.redis_client import RedisEmailClient
+from providers.sendgrid_provider import SendGridProvider
+from providers.smtp_provider import SMTPProvider
 
 class EmailWorker:
     """High-performance async email worker"""
@@ -40,23 +40,33 @@ class EmailWorker:
     
     async def start(self):
         """Start the email worker"""
-        await self.initialize_providers()
-        self.running = True
-        self.stats['started_at'] = datetime.utcnow()
-        
-        logging.info(f"Email worker {self.worker_id} started")
-        
-        # Start concurrent tasks
-        tasks = [
-            asyncio.create_task(self._process_emails()),
-            asyncio.create_task(self._process_retries()),
-            asyncio.create_task(self._report_stats())
-        ]
-        
         try:
-            await asyncio.gather(*tasks)
+            logging.info(f"Initializing providers for worker {self.worker_id}")
+            await self.initialize_providers()
+            self.running = True
+            self.stats['started_at'] = datetime.utcnow()
+            
+            logging.info(f"Email worker {self.worker_id} started, creating tasks...")
+            
+            # Start concurrent tasks
+            tasks = [
+                asyncio.create_task(self._process_emails()),
+                asyncio.create_task(self._process_retries()),
+                asyncio.create_task(self._report_stats())
+            ]
+            
+            logging.info(f"Worker {self.worker_id} created {len(tasks)} tasks, starting main loop")
+            
+            try:
+                await asyncio.gather(*tasks)
+            except Exception as e:
+                logging.error(f"Worker {self.worker_id} error: {e}")
+                import traceback
+                logging.error(traceback.format_exc())
         except Exception as e:
-            logging.error(f"Worker {self.worker_id} error: {e}")
+            logging.error(f"Worker {self.worker_id} startup error: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
         finally:
             self.running = False
     
@@ -136,6 +146,7 @@ class EmailWorker:
     
     async def _report_stats(self):
         """Report worker statistics"""
+        logging.info(f"Stats reporter started for worker {self.worker_id}")
         while self.running:
             try:
                 uptime = datetime.utcnow() - self.stats['started_at']
@@ -152,4 +163,6 @@ class EmailWorker:
                 await asyncio.sleep(60)  # Report every minute
             except Exception as e:
                 logging.error(f"Stats reporting error: {e}")
+                import traceback
+                logging.error(traceback.format_exc())
                 await asyncio.sleep(60)
