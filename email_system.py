@@ -8,28 +8,28 @@
 # Re-export all the main classes for the containerized services
 from config.email_config import EmailConfig
 from models.email_models import EmailJob, EmailPriority, EmailProvider, EmailStatus
-from redis_client_lib.redis_client import RedisEmailClient
-from services.email_service import EmailService
-from services.freeface_integration import FreeFaceEmailIntegration
-from workers.email_worker import EmailWorker
-from workers.circuit_breaker import CircuitBreaker
 from providers.base_provider import EmailProviderBase
 from providers.sendgrid_provider import SendGridProvider
 from providers.smtp_provider import SMTPProvider
+from redis_client_lib.redis_client import RedisEmailClient
+from services.email_service import EmailService
+from services.freeface_integration import FreeFaceEmailIntegration
+from workers.circuit_breaker import CircuitBreaker
+from workers.email_worker import EmailWorker
 
 # Export all classes for easy import
 __all__ = [
-    'EmailConfig',
-    'EmailJob',
-    'EmailPriority', 
-    'EmailProvider',
-    'EmailStatus',
-    'RedisEmailClient',
-    'EmailService',
-    'FreeFaceEmailIntegration',
-    'EmailWorker',
-    'CircuitBreaker',
-    'EmailProviderBase',
-    'SendGridProvider',
-    'SMTPProvider'
+    "EmailConfig",
+    "EmailJob",
+    "EmailPriority",
+    "EmailProvider",
+    "EmailStatus",
+    "RedisEmailClient",
+    "EmailService",
+    "FreeFaceEmailIntegration",
+    "EmailWorker",
+    "CircuitBreaker",
+    "EmailProviderBase",
+    "SendGridProvider",
+    "SMTPProvider",
 ]
