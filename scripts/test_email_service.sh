@@ -18,7 +18,8 @@
 #   1 = One or more tests failed ✗
 ################################################################################
 
-set -e  # Exit on error (we'll handle errors ourselves)
+# Note: NOT using 'set -e' because we handle errors explicitly
+# Each test function returns 0/1 and we track pass/fail ourselves
 set -o pipefail
 
 # Colors for output
@@ -335,12 +336,9 @@ test_email_sending() {
 
     # Test: POST /send/welcome
     print_test "POST /send/welcome"
-    response=$(curl -s -w "\n%{http_code}" -X POST "$EMAIL_API_URL/send/welcome" \
-        -H "X-Service-Token: $SERVICE_TOKEN" \
-        -G \
-        --data-urlencode "user_email=welcome-test@example.com" \
-        --data-urlencode "user_name=Welcome User" \
-        --data-urlencode "verification_token=abc123xyz")
+    response=$(curl -s -w "\n%{http_code}" -X POST \
+        "$EMAIL_API_URL/send/welcome?user_email=welcome-test@example.com&user_name=Welcome%20User&verification_token=abc123xyz" \
+        -H "X-Service-Token: $SERVICE_TOKEN")
     http_code=$(echo "$response" | tail -n 1)
     body=$(echo "$response" | head -n -1)
 
@@ -354,11 +352,9 @@ test_email_sending() {
 
     # Test: POST /send/password-reset
     print_test "POST /send/password-reset"
-    response=$(curl -s -w "\n%{http_code}" -X POST "$EMAIL_API_URL/send/password-reset" \
-        -H "X-Service-Token: $SERVICE_TOKEN" \
-        -G \
-        --data-urlencode "user_email=reset-test@example.com" \
-        --data-urlencode "reset_token=reset123xyz")
+    response=$(curl -s -w "\n%{http_code}" -X POST \
+        "$EMAIL_API_URL/send/password-reset?user_email=reset-test@example.com&reset_token=reset123xyz" \
+        -H "X-Service-Token: $SERVICE_TOKEN")
     http_code=$(echo "$response" | tail -n 1)
     body=$(echo "$response" | head -n -1)
 
@@ -426,7 +422,7 @@ test_email_delivery() {
 
     # Test: Verify specific email received
     print_test "Basic test email received in MailHog"
-    if echo "$messages" | jq -e '.items[] | select(.Content.Headers.To[0] | contains("basic-test@example.com"))' > /dev/null 2>&1; then
+    if echo "$messages" | jq -e '(.items // .) | .[] | select((.Content.Headers.To[0] // .To[0] // .Raw.To) | test("basic-test@example.com"; "i"))' > /dev/null 2>&1; then
         print_pass
     else
         print_fail "Basic email delivery" "Email to basic-test@example.com not found in MailHog"
@@ -434,7 +430,7 @@ test_email_delivery() {
 
     # Test: Welcome email received
     print_test "Welcome email received in MailHog"
-    if echo "$messages" | jq -e '.items[] | select(.Content.Headers.To[0] | contains("welcome-test@example.com"))' > /dev/null 2>&1; then
+    if echo "$messages" | jq -e '(.items // .) | .[] | select((.Content.Headers.To[0] // .To[0] // .Raw.To) | test("welcome-test@example.com"; "i"))' > /dev/null 2>&1; then
         print_pass
     else
         print_fail "Welcome email delivery" "Email to welcome-test@example.com not found in MailHog"
@@ -442,7 +438,7 @@ test_email_delivery() {
 
     # Test: Password reset email received
     print_test "Password reset email received in MailHog"
-    if echo "$messages" | jq -e '.items[] | select(.Content.Headers.To[0] | contains("reset-test@example.com"))' > /dev/null 2>&1; then
+    if echo "$messages" | jq -e '(.items // .) | .[] | select((.Content.Headers.To[0] // .To[0] // .Raw.To) | test("reset-test@example.com"; "i"))' > /dev/null 2>&1; then
         print_pass
     else
         print_fail "Reset email delivery" "Email to reset-test@example.com not found in MailHog"
