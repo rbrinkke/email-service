@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 
 from config.logging_config import setup_logging
 from email_system import EmailService, EmailConfig
+from services.audit_service import audit_trail
 
 # Configure logging using centralized configuration
 # This sets up Docker-compatible logging (stdout/stderr only)
@@ -34,6 +35,11 @@ email_service = EmailService(config)
 @app.on_event("startup")
 async def startup_event():
     await email_service.initialize()
+
+    # Initialize audit trail with Redis client
+    audit_trail.set_redis_client(email_service.redis_client)
+    logger.info("Audit trail initialized for monitoring")
+
     logger.info("Email monitoring dashboard started")
 
 @app.on_event("shutdown")
@@ -112,3 +118,128 @@ async def dead_letter_queue():
             continue
     
     return {"dead_letter_jobs": jobs, "count": len(jobs)}
+
+@app.get("/api/service-metrics")
+async def service_metrics():
+    """
+    Get per-service usage metrics
+
+    Returns metrics for all services that have called the email API:
+    - Total API calls
+    - Total emails sent
+    - Calls today
+    - Per-endpoint breakdown
+
+    Example response:
+    {
+        "main-app": {
+            "total_calls": 1247,
+            "total_emails": 5623,
+            "calls_today": 45,
+            "endpoints": {
+                "/send": 800,
+                "/send/welcome": 300,
+                "/send/password-reset": 100,
+                "/stats": 47
+            }
+        },
+        "user-service": { ... }
+    }
+    """
+    try:
+        metrics = await audit_trail.get_all_services_metrics()
+        return {
+            "services": metrics,
+            "total_services": len(metrics),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Failed to get service metrics: {e}")
+        return {
+            "services": {},
+            "total_services": 0,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/service-metrics/{service_name}")
+async def service_metrics_detail(service_name: str):
+    """
+    Get detailed metrics for a specific service
+
+    Args:
+        service_name: Service identifier (e.g., "main-app")
+
+    Returns detailed usage metrics for the specified service
+    """
+    try:
+        metrics = await audit_trail.get_service_metrics(service_name)
+
+        if not metrics:
+            return {
+                "service": service_name,
+                "error": "Service not found or no metrics available",
+                "timestamp": datetime.now().isoformat()
+            }
+
+        return {
+            "service": service_name,
+            "metrics": metrics,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get metrics for service {service_name}: {e}")
+        return {
+            "service": service_name,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/audit/{job_id}")
+async def job_audit(job_id: str):
+    """
+    Get audit record for a specific email job
+
+    Args:
+        job_id: Email job identifier
+
+    Returns audit information including which service sent the email
+
+    Example response:
+    {
+        "job_id": "job_abc123",
+        "audit": {
+            "service": "main-app",
+            "endpoint": "/send",
+            "timestamp": "2025-11-08T14:30:00",
+            "template": "welcome",
+            "recipient_count": 1
+        }
+    }
+    """
+    try:
+        audit = await audit_trail.get_job_audit(job_id)
+
+        if not audit:
+            return {
+                "job_id": job_id,
+                "audit": None,
+                "error": "Audit record not found (job may be older than 30 days)",
+                "timestamp": datetime.now().isoformat()
+            }
+
+        return {
+            "job_id": job_id,
+            "audit": audit,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get audit for job {job_id}: {e}")
+        return {
+            "job_id": job_id,
+            "audit": None,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
