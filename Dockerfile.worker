@@ -25,6 +25,7 @@ COPY redis_client_lib/ redis_client_lib/
 COPY services/ services/
 COPY workers/ workers/
 COPY templates/ templates/
+COPY utils/ utils/
 
 # Note: No logs directory needed - all logs go to stdout/stderr for Docker
 
