@@ -6,14 +6,16 @@ import logging
 import os
 import signal
 
+from config.logging_config import setup_logging
 from email_system import EmailConfig, EmailService
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
-)
+# Configure logging using centralized configuration
+# This sets up Docker-compatible logging (stdout/stderr only)
+# Respects LOG_LEVEL, ENVIRONMENT, and other logging env vars
+setup_logging()
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 class EmailWorkerProcess:
@@ -36,26 +38,26 @@ class EmailWorkerProcess:
         # Start single worker
         await self.email_service.start_workers(worker_count=1)
 
-        logging.info(f"Email worker {self.worker_id} started successfully")
+        logger.info(f"Email worker {self.worker_id} started successfully")
 
         # Keep running until shutdown
         try:
             while self.running:
                 await asyncio.sleep(1)
         except KeyboardInterrupt:
-            logging.info("Received shutdown signal")
+            logger.info("Received shutdown signal")
         finally:
             await self.shutdown()
 
     async def shutdown(self):
         """Graceful shutdown"""
-        logging.info(f"Shutting down worker {self.worker_id}")
+        logger.info(f"Shutting down worker {self.worker_id}")
         self.running = False
         await self.email_service.shutdown()
 
     def signal_handler(self, signum, frame):
         """Handle shutdown signals"""
-        logging.info(f"Received signal {signum}")
+        logger.info(f"Received signal {signum}")
         self.running = False
 
 

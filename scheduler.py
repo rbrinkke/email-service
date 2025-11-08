@@ -5,16 +5,16 @@ import asyncio
 import logging
 import os
 import time
+from config.logging_config import setup_logging
 from email_system import EmailService, EmailConfig, EmailJob
 
-logging.basicConfig(
-    level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO')),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/opt/email/logs/scheduler.log'),
-        logging.StreamHandler()
-    ]
-)
+# Configure logging using centralized configuration
+# This sets up Docker-compatible logging (stdout/stderr only)
+# Respects LOG_LEVEL, ENVIRONMENT, and other logging env vars
+setup_logging()
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 class EmailScheduler:
     """Process scheduled emails and move them to immediate queues"""
@@ -31,14 +31,14 @@ class EmailScheduler:
     async def start(self):
         """Start the scheduler"""
         await self.email_service.initialize()
-        logging.info("Email scheduler started")
-        
+        logger.info("Email scheduler started")
+
         while self.running:
             try:
                 await self.process_scheduled_emails()
                 await asyncio.sleep(self.interval)
             except Exception as e:
-                logging.error(f"Scheduler error: {e}")
+                logger.error(f"Scheduler error: {e}")
                 await asyncio.sleep(self.interval)
     
     async def process_scheduled_emails(self):
@@ -72,13 +72,13 @@ class EmailScheduler:
                 await redis.delete(f"email:job:{job_id}")
                 
                 processed += 1
-                logging.info(f"Scheduled email {job_id} queued for delivery")
-                
+                logger.info(f"Scheduled email {job_id} queued for delivery")
+
             except Exception as e:
-                logging.error(f"Error processing scheduled job {job_id}: {e}")
-        
+                logger.error(f"Error processing scheduled job {job_id}: {e}")
+
         if processed > 0:
-            logging.info(f"Processed {processed} scheduled emails")
+            logger.info(f"Processed {processed} scheduled emails")
 
 async def main():
     scheduler = EmailScheduler()

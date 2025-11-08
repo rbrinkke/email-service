@@ -33,7 +33,7 @@ services:
 
   # Email Workers
   email-worker-1:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.worker
     container_name: freeface-email-worker-1
@@ -41,7 +41,11 @@ services:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
       - WORKER_ID=worker-1
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Logging configuration
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - LOG_FORMAT=${LOG_FORMAT:-text}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
@@ -49,13 +53,11 @@ services:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
-    volumes:
-      - ./logs:/app/logs
     networks:
       - email_network
 
   email-worker-2:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.worker
     container_name: freeface-email-worker-2
@@ -63,7 +65,11 @@ services:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
       - WORKER_ID=worker-2
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Logging configuration
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - LOG_FORMAT=${LOG_FORMAT:-text}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
@@ -71,13 +77,11 @@ services:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
-    volumes:
-      - ./logs:/app/logs
     networks:
       - email_network
 
   email-worker-3:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.worker
     container_name: freeface-email-worker-3
@@ -85,7 +89,11 @@ services:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
       - WORKER_ID=worker-3
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Logging configuration
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - LOG_FORMAT=${LOG_FORMAT:-text}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
@@ -93,8 +101,6 @@ services:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
-    volumes:
-      - ./logs:/app/logs
     networks:
       - email_network
 
@@ -109,7 +115,11 @@ services:
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Logging configuration
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - LOG_FORMAT=${LOG_FORMAT:-text}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
@@ -117,8 +127,6 @@ services:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
-    volumes:
-      - ./logs:/app/logs
     networks:
       - email_network
     healthcheck:
@@ -138,13 +146,14 @@ services:
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Logging configuration
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - LOG_FORMAT=${LOG_FORMAT:-text}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
-    volumes:
-      - ./logs:/app/logs
     networks:
       - email_network
 
@@ -157,7 +166,11 @@ services:
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Logging configuration
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - LOG_FORMAT=${LOG_FORMAT:-text}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
@@ -165,8 +178,6 @@ services:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
-    volumes:
-      - ./logs:/app/logs
     networks:
       - email_network
 

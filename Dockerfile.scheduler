@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install pyyaml
 
 # Copy application code
 COPY email_system.py .
@@ -23,9 +24,9 @@ COPY providers/ providers/
 COPY redis_client_lib/ redis_client_lib/
 COPY services/ services/
 COPY workers/ workers/
+COPY utils/ utils/
 
-# Create logs directory
-RUN mkdir -p logs
+# Note: No logs directory needed - all logs go to stdout/stderr for Docker
 
 # Create non-root user
 RUN useradd -r -s /bin/false emailscheduler
