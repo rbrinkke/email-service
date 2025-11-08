@@ -9,14 +9,16 @@ from typing import Dict, List, Optional, Union
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, EmailStr
 
+from config.logging_config import setup_logging
 from email_system import EmailConfig, EmailPriority, EmailProvider, EmailService
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("/opt/email/logs/api.log"), logging.StreamHandler()],
-)
+# Configure logging using centralized configuration
+# This sets up Docker-compatible logging (stdout/stderr only)
+# Respects LOG_LEVEL, ENVIRONMENT, and other logging env vars
+setup_logging()
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="FreeFace Email Service API",
@@ -58,14 +60,14 @@ class StatsResponse(BaseModel):
 async def startup_event():
     """Initialize the email service on startup"""
     await email_service.initialize()
-    logging.info("Email API service started")
+    logger.info("Email API service started")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
     await email_service.shutdown()
-    logging.info("Email API service stopped")
+    logger.info("Email API service stopped")
 
 
 @app.post("/send", response_model=EmailResponse)
@@ -93,7 +95,7 @@ async def send_email(request: EmailRequest):
         return EmailResponse(job_id=job_id, status="queued", message="Email successfully queued for delivery")
 
     except Exception as e:
-        logging.error(f"Email send error: {e}")
+        logger.error(f"Email send error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -157,7 +159,7 @@ async def get_stats():
         )
 
     except Exception as e:
-        logging.error(f"Stats error: {e}")
+        logger.error(f"Stats error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

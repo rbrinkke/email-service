@@ -1,0 +1,253 @@
+# FreeFace Email Service - Logging Configuration
+#
+# This YAML file defines the logging behavior for the entire email service.
+# It provides granular control over log levels, formats, and destinations.
+#
+# Key Features:
+# - All logs go to stdout/stderr (Docker-compatible)
+# - Separate handlers for normal logs (stdout) and errors (stderr)
+# - Per-logger level control
+# - Prevention of log duplication through propagate: no
+# - Third-party library noise filtering
+#
+# Environment Variables:
+# - LOG_LEVEL: Global log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+# - ENVIRONMENT: Environment name (development, staging, production)
+# - LOG_FORMAT: Future use for JSON formatting
+#
+# To override a specific logger level at runtime:
+# - Set LOGGER_LEVEL_<logger_name>=DEBUG
+# - Example: LOGGER_LEVEL_REDIS=DEBUG enables redis debug logs
+
+version: 1
+disable_existing_loggers: false
+
+# Formatters define how log messages are structured
+formatters:
+  # Simple format for production - minimal overhead
+  simple:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+  # Detailed format for development - includes file location
+  detailed:
+    format: '%(asctime)s - [%(name)s] - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+  # Verbose format for deep debugging - includes process/thread info
+  verbose:
+    format: '%(asctime)s - [%(name)s] - %(levelname)s - [%(processName)s:%(process)d] [%(threadName)s:%(thread)d] - [%(filename)s:%(lineno)d:%(funcName)s] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+# Handlers define where logs go and how they're formatted
+handlers:
+  # Standard output handler - for INFO and DEBUG messages
+  stdout:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: detailed
+    stream: ext://sys.stdout
+    # This goes to Docker's stdout, visible via `docker logs`
+
+  # Standard error handler - for ERROR and CRITICAL messages
+  stderr:
+    class: logging.StreamHandler
+    level: ERROR
+    formatter: detailed
+    stream: ext://sys.stderr
+    # This goes to Docker's stderr, also visible via `docker logs`
+    # Some monitoring tools can differentiate stdout vs stderr
+
+# Loggers - granular control per module/component
+loggers:
+  # ============================================================
+  # UVICORN LOGGERS (ASGI Server)
+  # ============================================================
+
+  uvicorn.error:
+    # Server errors, startup/shutdown messages
+    level: INFO
+    handlers: [stdout, stderr]
+    propagate: no  # CRITICAL: Prevents duplicate logs
+
+  uvicorn.access:
+    # HTTP access logs (we disable this in favor of custom middleware)
+    level: WARNING  # Effectively disabled
+    handlers: []
+    propagate: no
+
+  # ============================================================
+  # APPLICATION LOGGERS (FreeFace Email Service)
+  # ============================================================
+
+  email_system:
+    # Main email system orchestration
+    level: DEBUG
+    handlers: [stdout, stderr]
+    propagate: no
+
+  api:
+    # FastAPI application logic
+    level: DEBUG
+    handlers: [stdout, stderr]
+    propagate: no
+
+  worker:
+    # Email worker processes
+    level: DEBUG
+    handlers: [stdout, stderr]
+    propagate: no
+
+  scheduler:
+    # Scheduled email jobs
+    level: DEBUG
+    handlers: [stdout, stderr]
+    propagate: no
+
+  monitor:
+    # Monitoring dashboard
+    level: INFO
+    handlers: [stdout, stderr]
+    propagate: no
+
+  config:
+    # Configuration module logs
+    level: INFO
+    handlers: [stdout, stderr]
+    propagate: no
+
+  services:
+    # Service layer (email_service, freeface_integration)
+    level: DEBUG
+    handlers: [stdout, stderr]
+    propagate: no
+
+  services.email_service:
+    # Email service specifically
+    level: DEBUG
+    handlers: [stdout, stderr]
+    propagate: no
+
+  services.freeface_integration:
+    # FreeFace integration layer
+    level: DEBUG
+    handlers: [stdout, stderr]
+    propagate: no
+
+  providers:
+    # Email providers (SMTP, SendGrid, etc.)
+    level: DEBUG
+    handlers: [stdout, stderr]
+    propagate: no
+
+  providers.smtp_provider:
+    level: DEBUG
+    handlers: [stdout, stderr]
+    propagate: no
+
+  providers.sendgrid_provider:
+    level: DEBUG
+    handlers: [stdout, stderr]
+    propagate: no
+
+  models:
+    # Data models
+    level: INFO
+    handlers: [stdout, stderr]
+    propagate: no
+
+  # ============================================================
+  # THIRD-PARTY LIBRARY LOGGERS (Noise Control)
+  # ============================================================
+
+  redis:
+    # Redis client - very verbose on DEBUG
+    level: WARNING
+    handlers: [stdout, stderr]
+    propagate: no
+
+  redis.asyncio:
+    level: WARNING
+    handlers: [stdout, stderr]
+    propagate: no
+
+  asyncio:
+    # Python asyncio - extremely verbose on DEBUG
+    level: WARNING
+    handlers: [stdout, stderr]
+    propagate: no
+
+  httpx:
+    # HTTP client library
+    level: WARNING
+    handlers: [stdout, stderr]
+    propagate: no
+
+  httpcore:
+    # HTTP core library (used by httpx)
+    level: WARNING
+    handlers: [stdout, stderr]
+    propagate: no
+
+  urllib3:
+    # HTTP library (used by requests)
+    level: WARNING
+    handlers: [stdout, stderr]
+    propagate: no
+
+  aiosmtplib:
+    # Async SMTP library - can be verbose
+    level: INFO
+    handlers: [stdout, stderr]
+    propagate: no
+
+  multipart:
+    # Multipart form parsing
+    level: WARNING
+    handlers: [stdout, stderr]
+    propagate: no
+
+  # ============================================================
+  # DEBUGGING HELPERS
+  # ============================================================
+  # To enable debug logging for a specific third-party library:
+  # 1. Set environment variable: LOGGER_LEVEL_REDIS=DEBUG
+  # 2. Or temporarily edit this file and change level to DEBUG
+  # 3. Rebuild container: docker-compose up --build
+
+  # Example for debugging Redis issues:
+  # redis:
+  #   level: DEBUG  # Temporarily enable for troubleshooting
+
+# Root logger - catches everything not explicitly configured above
+root:
+  level: INFO  # Will be overridden by LOG_LEVEL env var
+  handlers: [stdout, stderr]
+
+# ============================================================
+# USAGE EXAMPLES
+# ============================================================
+#
+# Development (verbose debugging):
+# ---------------------------------
+# docker-compose up
+# (LOG_LEVEL defaults to DEBUG in .env)
+#
+# Production (minimal noise):
+# ---------------------------
+# LOG_LEVEL=INFO docker-compose up
+#
+# Debug specific component:
+# -------------------------
+# LOGGER_LEVEL_REDIS=DEBUG docker-compose up
+#
+# Debug email provider issues:
+# -----------------------------
+# LOGGER_LEVEL_PROVIDERS_SMTP_PROVIDER=DEBUG docker-compose up
+#
+# View logs:
+# ----------
+# docker logs -f freeface-email-api
+# docker logs -f freeface-email-worker-1 --tail 100
+#
+# ============================================================

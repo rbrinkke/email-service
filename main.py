@@ -7,22 +7,21 @@ import logging
 from datetime import datetime, timedelta
 
 from config.email_config import EmailConfig
+from config.logging_config import setup_logging
 from models.email_models import EmailPriority
 from services.email_service import EmailService
 from services.freeface_integration import FreeFaceEmailIntegration
 
 async def main():
     """Main application entry point"""
-    
-    # Setup logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler('/opt/freeface/email/logs/email.log'),
-            logging.StreamHandler()
-        ]
-    )
+
+    # Setup logging using centralized configuration
+    # This sets up Docker-compatible logging (stdout/stderr only)
+    # Respects LOG_LEVEL, ENVIRONMENT, and other logging env vars
+    setup_logging()
+
+    # Get logger for this module
+    logger = logging.getLogger(__name__)
     
     # Initialize configuration
     config = EmailConfig()
@@ -36,9 +35,9 @@ async def main():
     
     # Create integration layer
     integration = FreeFaceEmailIntegration(email_service)
-    
+
     # Example usage
-    logging.info("FreeFace Email System started - sending test emails")
+    logger.info("FreeFace Email System started - sending test emails")
     
     # Example: Send welcome email
     job_id = await email_service.send_email(
@@ -80,10 +79,10 @@ async def main():
     try:
         while True:
             stats = await email_service.get_stats()
-            logging.info(f"Email system stats: {stats}")
+            logger.info(f"Email system stats: {stats}")
             await asyncio.sleep(30)
     except KeyboardInterrupt:
-        logging.info("Shutting down email system...")
+        logger.info("Shutting down email system...")
         await email_service.shutdown()
 
 if __name__ == "__main__":

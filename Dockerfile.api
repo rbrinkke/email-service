@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install fastapi uvicorn
+RUN pip install fastapi uvicorn pyyaml
 
 # Copy application code
 COPY email_system.py .
@@ -26,8 +26,7 @@ COPY services/ services/
 COPY workers/ workers/
 COPY templates/ templates/
 
-# Create logs directory
-RUN mkdir -p logs
+# Note: No logs directory needed - all logs go to stdout/stderr for Docker
 
 # Create non-root user
 RUN useradd -r -s /bin/false emailapi
@@ -36,4 +35,13 @@ USER emailapi
 
 EXPOSE 8010
 
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8010", "--workers", "4"]
+# Start Uvicorn with environment-aware logging
+# --log-config is handled by our Python code via setup_logging()
+# --no-access-log disables default access logs (we use custom middleware)
+# Note: Using shell form to allow environment variable expansion
+CMD uvicorn api:app \
+    --host 0.0.0.0 \
+    --port 8010 \
+    --workers 4 \
+    --log-level ${LOG_LEVEL:-info} \
+    --no-access-log

@@ -1,13 +1,25 @@
 # File: monitor.py
 # Email System Monitoring Dashboard
 
+import json
+import logging
+import os
+from datetime import datetime, timedelta
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-import json
-import os
-from datetime import datetime, timedelta
+
+from config.logging_config import setup_logging
 from email_system import EmailService, EmailConfig
+
+# Configure logging using centralized configuration
+# This sets up Docker-compatible logging (stdout/stderr only)
+# Respects LOG_LEVEL, ENVIRONMENT, and other logging env vars
+setup_logging()
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="FreeFace Email Monitor")
 templates = Jinja2Templates(directory="templates")
@@ -22,6 +34,12 @@ email_service = EmailService(config)
 @app.on_event("startup")
 async def startup_event():
     await email_service.initialize()
+    logger.info("Email monitoring dashboard started")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await email_service.shutdown()
+    logger.info("Email monitoring dashboard stopped")
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
