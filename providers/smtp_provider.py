@@ -61,7 +61,10 @@ class SMTPProvider(EmailProviderBase):
                 start_tls=use_tls
             ) as smtp:
                 # Only login if username and password are provided and not empty
-                if self.config.get('username') and self.config.get('password'):
+                # Skip login for localhost/debug servers
+                if (self.config.get('username') and
+                    self.config.get('password') and
+                    self.config['host'] not in ['localhost', '127.0.0.1', 'mailhog']):
                     await smtp.login(self.config['username'], self.config['password'])
                 
                 for email in job.to:
