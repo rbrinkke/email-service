@@ -38,7 +38,7 @@ class EmailWorkerProcess:
         # Start single worker
         await self.email_service.start_workers(worker_count=1)
 
-        logger.info(f"Email worker {self.worker_id} started successfully")
+        logger.info("Email worker %s started successfully", self.worker_id)
 
         # Keep running until shutdown
         try:
@@ -51,13 +51,13 @@ class EmailWorkerProcess:
 
     async def shutdown(self):
         """Graceful shutdown"""
-        logger.info(f"Shutting down worker {self.worker_id}")
+        logger.info("Shutting down worker %s", self.worker_id)
         self.running = False
         await self.email_service.shutdown()
 
     def signal_handler(self, signum, frame):
         """Handle shutdown signals"""
-        logger.info(f"Received signal {signum}")
+        logger.info("Received signal %s", signum)
         self.running = False
 
 

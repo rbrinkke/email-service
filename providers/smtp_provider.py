@@ -12,7 +12,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from models.email_models import EmailJob
 from redis_client_lib.redis_client import RedisEmailClient
-from utils.debug_utils import log_timing, debug_context, log_provider_operation
+from utils.debug_utils import debug_context, log_provider_operation, log_timing
 
 from .base_provider import EmailProviderBase
 
@@ -27,57 +27,61 @@ class SMTPProvider(EmailProviderBase):
 
         # Log SMTP configuration (sanitized)
         logger.debug(
-            f"SMTP Provider initialized: host={config['host']}, "
-            f"port={config['port']}, use_tls={config.get('use_tls', 'true')}"
+            "SMTP Provider initialized: host=%s, port=%s, use_tls=%s",
+            config['host'], config['port'], config.get('use_tls', 'true')
         )
 
         # Set up template environment - use container path
         template_dir = "/opt/email/templates"
 
-        logger.debug(f"Loading email templates from: {template_dir}")
+        logger.debug("Loading email templates from: %s", template_dir)
 
         self.template_env = Environment(
             loader=FileSystemLoader(template_dir), autoescape=select_autoescape(["html", "xml"])
         )
 
-        logger.info(f"SMTP Provider ready: {config['host']}:{config['port']}")
+        logger.info("SMTP Provider ready: %s:%s", config['host'], config['port'])
 
     async def _send_email_impl(self, job: EmailJob) -> bool:
         """Send email via SMTP"""
 
-        logger.debug(f"SMTP: Processing job {job.job_id} for {len(job.to)} recipient(s)")
+        logger.debug("SMTP: Processing job %s for %s recipient(s)", job.job_id, len(job.to))
 
         # Create message
         message = MIMEMultipart("alternative")
         message["From"] = self.config["from_email"]
         message["Subject"] = job.data.get("subject", "FreeFace Notification")
 
-        logger.debug(f"SMTP: Email from={self.config['from_email']}, subject='{message['Subject']}'")
+        logger.debug(
+            "SMTP: Email from=%s, subject='%s'", self.config['from_email'], message['Subject']
+        )
 
         # Render template
         try:
             template_name = f"{job.template}.html"
 
-            logger.debug(f"SMTP: Attempting to load template '{template_name}'")
+            logger.debug("SMTP: Attempting to load template '%s'", template_name)
 
             with log_timing(f"template_render_{job.template}", logger):
                 # Try to load the template
                 template = self.template_env.get_template(template_name)
 
-                logger.debug(f"SMTP: Template '{template_name}' loaded successfully")
+                logger.debug("SMTP: Template '%s' loaded successfully", template_name)
 
                 # Render with data
-                logger.debug(f"SMTP: Rendering template with {len(job.data)} data key(s)")
+                logger.debug("SMTP: Rendering template with %s data key(s)", len(job.data))
 
                 html_content = template.render(**job.data)
 
-                logger.debug(f"SMTP: Template rendered successfully, content length: {len(html_content)} chars")
+                logger.debug(
+                    "SMTP: Template rendered successfully, content length: %s chars", len(html_content)
+                )
 
         except Exception as e:
             # Log the actual error for debugging
             logger.warning(
-                f"SMTP: Template '{job.template}.html' not found or render error: {e}. "
-                f"Using fallback HTML."
+                "SMTP: Template '%s.html' not found or render error: %s. Using fallback HTML.",
+                job.template, e
             )
 
             # Fallback to simple HTML if template not found
@@ -85,7 +89,7 @@ class SMTPProvider(EmailProviderBase):
             message_text = job.data.get("message", "Default message")
             html_content = f"<h1>{subject}</h1><p>{message_text}</p>"
 
-            logger.debug(f"SMTP: Fallback HTML created, length: {len(html_content)} chars")
+            logger.debug("SMTP: Fallback HTML created, length: %s chars", len(html_content))
 
         html_part = MIMEText(html_content, "html")
         message.attach(html_part)
@@ -97,18 +101,20 @@ class SMTPProvider(EmailProviderBase):
             # Check if TLS should be used (for Mailhog, we don't need TLS)
             use_tls = self.config.get("use_tls", "true").lower() == "true"
 
-            logger.debug(f"SMTP: Connecting to {self.config['host']}:{self.config['port']} (TLS={use_tls})")
+            logger.debug(
+                "SMTP: Connecting to %s:%s (TLS=%s)", self.config['host'], self.config['port'], use_tls
+            )
 
             log_provider_operation(
                 logger,
                 "smtp",
                 "connect",
                 {
-                    "host": self.config['host'],
-                    "port": self.config['port'],
+                    "host": self.config["host"],
+                    "port": self.config["port"],
                     "use_tls": use_tls,
-                    "recipients": len(job.to)
-                }
+                    "recipients": len(job.to),
+                },
             )
 
             with log_timing(f"smtp_send_job_{job.job_id}", logger):
@@ -124,7 +130,7 @@ class SMTPProvider(EmailProviderBase):
                         and self.config.get("password")
                         and self.config["host"] not in ["localhost", "127.0.0.1", "mailhog"]
                     ):
-                        logger.debug(f"SMTP: Authenticating as {self.config.get('username')}")
+                        logger.debug("SMTP: Authenticating as %s", self.config.get('username'))
 
                         with log_timing("smtp_login", logger):
                             await smtp.login(self.config["username"], self.config["password"])
@@ -136,7 +142,7 @@ class SMTPProvider(EmailProviderBase):
                     # Send to each recipient
                     sent_count = 0
                     for email in job.to:
-                        logger.debug(f"SMTP: Sending to {email}")
+                        logger.debug("SMTP: Sending to %s", email)
 
                         message["To"] = email
 
@@ -144,11 +150,15 @@ class SMTPProvider(EmailProviderBase):
                             await smtp.send_message(message)
 
                         sent_count += 1
-                        logger.debug(f"SMTP: Successfully sent to {email} ({sent_count}/{len(job.to)})")
+                        logger.debug(
+                            "SMTP: Successfully sent to %s (%s/%s)", email, sent_count, len(job.to)
+                        )
 
                         del message["To"]
 
-                    logger.info(f"SMTP: Job {job.job_id} sent successfully to {sent_count} recipient(s)")
+                    logger.info(
+                        "SMTP: Job %s sent successfully to %s recipient(s)", job.job_id, sent_count
+                    )
 
                     log_provider_operation(
                         logger,
@@ -157,47 +167,31 @@ class SMTPProvider(EmailProviderBase):
                         {
                             "job_id": job.job_id,
                             "recipients_sent": sent_count,
-                            "template": job.template
-                        }
+                            "template": job.template,
+                        },
                     )
 
                     return True
 
         except aiosmtplib.SMTPException as e:
             # SMTP-specific errors
-            logger.error(
-                f"SMTP error for job {job.job_id}: {type(e).__name__}: {e}",
-                exc_info=True
-            )
+            logger.error("SMTP error for job %s: %s: %s", job.job_id, type(e).__name__, e, exc_info=True)
 
             log_provider_operation(
                 logger,
                 "smtp",
                 "send_failed",
-                {
-                    "job_id": job.job_id,
-                    "error_type": type(e).__name__,
-                    "error": str(e)
-                }
+                {"job_id": job.job_id, "error_type": type(e).__name__, "error": str(e)},
             )
 
             return False
 
         except Exception as e:
             # General errors
-            logger.error(
-                f"SMTP error for job {job.job_id}: {e}",
-                exc_info=True
-            )
+            logger.error("SMTP error for job %s: %s", job.job_id, e, exc_info=True)
 
             log_provider_operation(
-                logger,
-                "smtp",
-                "send_failed",
-                {
-                    "job_id": job.job_id,
-                    "error": str(e)
-                }
+                logger, "smtp", "send_failed", {"job_id": job.job_id, "error": str(e)}
             )
 
             return False

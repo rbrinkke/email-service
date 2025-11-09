@@ -11,8 +11,8 @@ from pydantic import BaseModel, EmailStr
 
 from config.logging_config import setup_logging
 from email_system import EmailConfig, EmailPriority, EmailProvider, EmailService
-from services.auth_service import ServiceIdentity, authenticator
 from services.audit_service import audit_trail
+from services.auth_service import ServiceIdentity, authenticator
 
 # Configure logging using centralized configuration
 # This sets up Docker-compatible logging (stdout/stderr only)
@@ -29,7 +29,9 @@ app = FastAPI(
 )
 
 # Initialize email service
-config = EmailConfig(redis_host=os.getenv("REDIS_HOST", "10.10.1.21"), redis_port=int(os.getenv("REDIS_PORT", 6379)))
+config = EmailConfig(
+    redis_host=os.getenv("REDIS_HOST", "10.10.1.21"), redis_port=int(os.getenv("REDIS_PORT", 6379))
+)
 email_service = EmailService(config)
 
 
@@ -38,7 +40,7 @@ async def verify_service_token(
     x_service_token: Optional[str] = Header(
         None,
         description="Service authentication token (format: st_<env>_<random>)",
-        example="st_live_abc123def456..."
+        example="st_live_abc123def456...",
     )
 ) -> ServiceIdentity:
     """
@@ -110,8 +112,7 @@ async def shutdown_event():
 
 @app.post("/send", response_model=EmailResponse)
 async def send_email(
-    request: EmailRequest,
-    service: ServiceIdentity = Depends(verify_service_token)
+    request: EmailRequest, service: ServiceIdentity = Depends(verify_service_token)
 ):
     """
     Send email via the email system
@@ -126,7 +127,7 @@ async def send_email(
     - **scheduled_at**: Schedule for future delivery (optional)
     """
     try:
-        logger.info(f"Email send request from service: {service.name}")
+        logger.info("Email send request from service: %s", service.name)
 
         job_id = await email_service.send_email(
             recipients=request.recipients,
@@ -147,15 +148,17 @@ async def send_email(
                 "template": request.template,
                 "priority": request.priority.value,
                 "provider": request.provider.value,
-                "recipient_count": recipient_count
-            }
+                "recipient_count": recipient_count,
+            },
         )
 
-        logger.info(f"Email queued by service '{service.name}': job_id={job_id}")
-        return EmailResponse(job_id=job_id, status="queued", message="Email successfully queued for delivery")
+        logger.info("Email queued by service '%s': job_id=%s", service.name, job_id)
+        return EmailResponse(
+            job_id=job_id, status="queued", message="Email successfully queued for delivery"
+        )
 
     except Exception as e:
-        logger.error(f"Email send error (service: {service.name}): {e}")
+        logger.error("Email send error (service: %s): %s", service.name, e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -164,19 +167,22 @@ async def send_welcome_email(
     user_email: EmailStr,
     user_name: str,
     verification_token: str,
-    service: ServiceIdentity = Depends(verify_service_token)
+    service: ServiceIdentity = Depends(verify_service_token),
 ):
     """
     Send welcome email to new user
 
     **Authentication:** Requires valid service token via X-Service-Token header
     """
-    logger.info(f"Welcome email request from service: {service.name} for {user_email}")
+    logger.info("Welcome email request from service: %s for %s", service.name, user_email)
 
     job_id = await email_service.send_email(
         recipients=user_email,
         template="user_welcome",
-        data={"name": user_name, "verification_link": f"https://freeface.com/verify/{verification_token}"},
+        data={
+            "name": user_name,
+            "verification_link": f"https://freeface.com/verify/{verification_token}",
+        },
         priority=EmailPriority.HIGH,
     )
 
@@ -185,25 +191,23 @@ async def send_welcome_email(
         service_name=service.name,
         endpoint="/send/welcome",
         job_id=job_id,
-        metadata={"template": "user_welcome", "recipient_count": 1}
+        metadata={"template": "user_welcome", "recipient_count": 1},
     )
 
-    logger.info(f"Welcome email queued by service '{service.name}': job_id={job_id}")
+    logger.info("Welcome email queued by service '%s': job_id=%s", service.name, job_id)
     return EmailResponse(job_id=job_id, status="queued", message="Welcome email queued")
 
 
 @app.post("/send/password-reset")
 async def send_password_reset(
-    user_email: EmailStr,
-    reset_token: str,
-    service: ServiceIdentity = Depends(verify_service_token)
+    user_email: EmailStr, reset_token: str, service: ServiceIdentity = Depends(verify_service_token)
 ):
     """
     Send password reset email
 
     **Authentication:** Requires valid service token via X-Service-Token header
     """
-    logger.info(f"Password reset email request from service: {service.name} for {user_email}")
+    logger.info("Password reset email request from service: %s for %s", service.name, user_email)
 
     job_id = await email_service.send_email(
         recipients=user_email,
@@ -217,10 +221,10 @@ async def send_password_reset(
         service_name=service.name,
         endpoint="/send/password-reset",
         job_id=job_id,
-        metadata={"template": "password_reset", "recipient_count": 1}
+        metadata={"template": "password_reset", "recipient_count": 1},
     )
 
-    logger.info(f"Password reset email queued by service '{service.name}': job_id={job_id}")
+    logger.info("Password reset email queued by service '%s': job_id=%s", service.name, job_id)
     return EmailResponse(job_id=job_id, status="queued", message="Password reset email queued")
 
 
@@ -230,14 +234,14 @@ async def send_group_notification(
     template: str,
     data: Dict,
     priority: EmailPriority = EmailPriority.MEDIUM,
-    service: ServiceIdentity = Depends(verify_service_token)
+    service: ServiceIdentity = Depends(verify_service_token),
 ):
     """
     Send notification to group members
 
     **Authentication:** Requires valid service token via X-Service-Token header
     """
-    logger.info(f"Group notification request from service: {service.name} for group {group_id}")
+    logger.info("Group notification request from service: %s for group %s", service.name, group_id)
 
     job_id = await email_service.send_email(
         recipients=f"group:{group_id}", template=template, data=data, priority=priority
@@ -248,15 +252,18 @@ async def send_group_notification(
         service_name=service.name,
         endpoint="/send/group-notification",
         job_id=job_id,
-        metadata={
-            "template": template,
-            "group_id": group_id,
-            "priority": priority.value
-        }
+        metadata={"template": template, "group_id": group_id, "priority": priority.value},
     )
 
-    logger.info(f"Group notification queued by service '{service.name}': group={group_id}, job_id={job_id}")
-    return EmailResponse(job_id=job_id, status="queued", message=f"Group notification queued for {group_id}")
+    logger.info(
+        "Group notification queued by service '%s': group=%s, job_id=%s",
+        service.name,
+        group_id,
+        job_id,
+    )
+    return EmailResponse(
+        job_id=job_id, status="queued", message=f"Group notification queued for {group_id}"
+    )
 
 
 @app.get("/stats", response_model=StatsResponse)
@@ -267,14 +274,11 @@ async def get_stats(service: ServiceIdentity = Depends(verify_service_token)):
     **Authentication:** Requires valid service token via X-Service-Token header
     """
     try:
-        logger.debug(f"Stats request from service: {service.name}")
+        logger.debug("Stats request from service: %s", service.name)
 
         # Log to audit trail (no job_id for stats calls)
         await audit_trail.log_service_call(
-            service_name=service.name,
-            endpoint="/stats",
-            job_id=None,
-            metadata={}
+            service_name=service.name, endpoint="/stats", job_id=None, metadata={}
         )
 
         stats = await email_service.get_stats()
@@ -295,14 +299,28 @@ async def get_stats(service: ServiceIdentity = Depends(verify_service_token)):
         )
 
     except Exception as e:
-        logger.error(f"Stats error (service: {service.name}): {e}")
+        logger.error("Stats error (service: %s): %s", service.name, e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/live")
+async def liveness_check():
+    """
+    Liveness check endpoint (shallow health check)
+
+    **Authentication:** NO authentication required (public endpoint for monitoring)
+
+    Returns a simple alive status without checking dependencies.
+    This is ideal for Kubernetes liveness probes and basic uptime monitoring.
+    Use /health for readiness checks that verify Redis connectivity.
+    """
+    return {"status": "alive"}
 
 
 @app.get("/health")
 async def health_check():
     """
-    Health check endpoint
+    Health/readiness check endpoint (deep health check)
 
     **Authentication:** NO authentication required (public endpoint for monitoring)
 
@@ -310,6 +328,9 @@ async def health_check():
     - Docker healthchecks
     - Load balancer health monitoring
     - Service discovery systems
+    - Kubernetes readiness probes
+
+    Checks Redis connectivity and queue status.
     """
     try:
         # Test Redis connection

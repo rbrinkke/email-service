@@ -1,20 +1,21 @@
 # File: Dockerfile.api
-# Email API Container
-FROM python:3.11-slim
+# Email API Container - Built from base image
+FROM python:3.11-slim as base
 
 WORKDIR /opt/email
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copy and install Python requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install fastapi uvicorn pyyaml
 
-# Copy application code
+# Copy all application code
 COPY email_system.py .
 COPY api.py .
 COPY email_templates.py .
@@ -26,8 +27,6 @@ COPY services/ services/
 COPY workers/ workers/
 COPY templates/ templates/
 COPY utils/ utils/
-
-# Note: No logs directory needed - all logs go to stdout/stderr for Docker
 
 # Create non-root user
 RUN useradd -r -s /bin/false emailapi

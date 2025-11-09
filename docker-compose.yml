@@ -32,15 +32,15 @@ services:
       - email_network
 
   # Email Workers
-  email-worker-1:
+  # Note: Scale workers with: docker-compose up -d --scale email-worker=3
+  email-worker:
     build:
       context: .
       dockerfile: Dockerfile.worker
-    container_name: freeface-email-worker-1
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - WORKER_ID=worker-1
+      - WORKER_ID=worker-${HOSTNAME}
       # Logging configuration
       - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
       - LOG_FORMAT=${LOG_FORMAT:-text}
@@ -55,54 +55,8 @@ services:
     restart: unless-stopped
     networks:
       - email_network
-
-  email-worker-2:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    container_name: freeface-email-worker-2
-    environment:
-      - REDIS_HOST=redis-email
-      - REDIS_PORT=6379
-      - WORKER_ID=worker-2
-      # Logging configuration
-      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
-      - LOG_FORMAT=${LOG_FORMAT:-text}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      # Provider credentials
-      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
-      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-    depends_on:
-      redis-email:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - email_network
-
-  email-worker-3:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    container_name: freeface-email-worker-3
-    environment:
-      - REDIS_HOST=redis-email
-      - REDIS_PORT=6379
-      - WORKER_ID=worker-3
-      # Logging configuration
-      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
-      - LOG_FORMAT=${LOG_FORMAT:-text}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      # Provider credentials
-      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
-      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-    depends_on:
-      redis-email:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - email_network
+    deploy:
+      replicas: 3
 
   # Email API Service
   email-api:

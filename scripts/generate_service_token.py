@@ -39,8 +39,17 @@ class ServiceTokenGenerator:
     # Total: ~50 characters
     # Entropy: 160 bits (40 hex chars * 4 bits per hex)
 
-    VALID_ENVIRONMENTS = ['dev', 'development', 'test', 'staging', 'stage', 'prod', 'production', 'live']
-    DEFAULT_ENV = 'dev'
+    VALID_ENVIRONMENTS = [
+        "dev",
+        "development",
+        "test",
+        "staging",
+        "stage",
+        "prod",
+        "production",
+        "live",
+    ]
+    DEFAULT_ENV = "dev"
     TOKEN_LENGTH = 40  # hex chars (= 20 bytes = 160 bits)
 
     def __init__(self, environment: str = None):
@@ -71,15 +80,15 @@ class ServiceTokenGenerator:
 
         if env not in self.VALID_ENVIRONMENTS:
             print(f"⚠️  Warning: Unknown environment '{env}', using 'dev'")
-            return 'dev'
+            return "dev"
 
         # Normalize to short forms
         mapping = {
-            'development': 'dev',
-            'test': 'dev',
-            'production': 'live',
-            'prod': 'live',
-            'stage': 'staging',
+            "development": "dev",
+            "test": "dev",
+            "production": "live",
+            "prod": "live",
+            "stage": "staging",
         }
 
         return mapping.get(env, env)
@@ -128,16 +137,16 @@ class ServiceTokenGenerator:
         if not token:
             return False, "Token is empty"
 
-        if not token.startswith('st_'):
+        if not token.startswith("st_"):
             return False, "Token must start with 'st_'"
 
-        parts = token.split('_')
+        parts = token.split("_")
         if len(parts) != 3:
             return False, f"Token must have 3 parts (st_<env>_<random>), got {len(parts)}"
 
         prefix, env, random_part = parts
 
-        if prefix != 'st':
+        if prefix != "st":
             return False, f"Invalid prefix '{prefix}', expected 'st'"
 
         if not random_part:
@@ -228,37 +237,28 @@ Examples:
 
   # Just print the token (no formatting)
   %(prog)s --format raw
-        """
+        """,
     )
 
     parser.add_argument(
-        '--env', '--environment',
-        default='dev',
-        help='Target environment (dev, staging, production) (default: dev)'
+        "--env",
+        "--environment",
+        default="dev",
+        help="Target environment (dev, staging, production) (default: dev)",
     )
 
-    parser.add_argument(
-        '--service',
-        help='Service name (for .env format output)'
-    )
+    parser.add_argument("--service", help="Service name (for .env format output)")
+
+    parser.add_argument("--batch", type=int, help="Generate multiple tokens at once")
 
     parser.add_argument(
-        '--batch',
-        type=int,
-        help='Generate multiple tokens at once'
+        "--format",
+        choices=["info", "env", "raw"],
+        default="info",
+        help="Output format (default: info)",
     )
 
-    parser.add_argument(
-        '--format',
-        choices=['info', 'env', 'raw'],
-        default='info',
-        help='Output format (default: info)'
-    )
-
-    parser.add_argument(
-        '--validate',
-        help='Validate an existing token instead of generating'
-    )
+    parser.add_argument("--validate", help="Validate an existing token instead of generating")
 
     args = parser.parse_args()
 
@@ -279,10 +279,10 @@ Examples:
         tokens = generator.generate_batch(args.batch)
         print(f"\nGenerated {args.batch} tokens:\n")
         for i, token in enumerate(tokens, 1):
-            if args.format == 'env':
+            if args.format == "env":
                 service_name = args.service or f"SERVICE_{i}"
                 print(f"SERVICE_TOKEN_{service_name.upper().replace('-', '_')}={token}")
-            elif args.format == 'raw':
+            elif args.format == "raw":
                 print(token)
             else:
                 print(f"{i}. {token}")
@@ -292,11 +292,11 @@ Examples:
     # Single token generation
     token = generator.generate()
 
-    if args.format == 'raw':
+    if args.format == "raw":
         # Just print the token (for piping)
         print(token)
 
-    elif args.format == 'env':
+    elif args.format == "env":
         # .env file format
         service_name = args.service or "YOUR_SERVICE"
         env_var_name = f"SERVICE_TOKEN_{service_name.upper().replace('-', '_')}"
@@ -309,5 +309,5 @@ Examples:
         generator.print_token_info(token)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

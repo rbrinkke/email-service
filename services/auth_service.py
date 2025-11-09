@@ -25,6 +25,7 @@ class ServiceIdentity:
         authenticated_at: Timestamp when authentication occurred
         permissions: Set of allowed operations (future use)
     """
+
     name: str
     token: str
     authenticated_at: datetime
@@ -60,10 +61,10 @@ class ServiceAuthenticator:
     def __init__(self):
         """Initialize the service authenticator"""
         # Check if authentication is enabled
-        self.enabled = os.getenv('SERVICE_AUTH_ENABLED', 'true').lower() == 'true'
+        self.enabled = os.getenv("SERVICE_AUTH_ENABLED", "true").lower() == "true"
 
         # Token prefix for validation
-        self.token_prefix = os.getenv('SERVICE_TOKEN_PREFIX', 'st_')
+        self.token_prefix = os.getenv("SERVICE_TOKEN_PREFIX", "st_")
 
         # Load service tokens from environment
         self.service_tokens = self._load_service_tokens()
@@ -76,8 +77,10 @@ class ServiceAuthenticator:
 
         # Log initialization
         if self.enabled:
-            logger.info(f"Service authentication ENABLED: {len(self.service_tokens)} services configured")
-            logger.debug(f"Configured services: {', '.join(self.service_tokens.keys())}")
+            logger.info(
+                "Service authentication ENABLED: %s services configured", len(self.service_tokens)
+            )
+            logger.debug("Configured services: %s", ', '.join(self.service_tokens.keys()))
         else:
             logger.warning("Service authentication DISABLED - all requests will be accepted")
 
@@ -102,30 +105,30 @@ class ServiceAuthenticator:
 
         # Scan environment for SERVICE_TOKEN_* variables
         for env_key, env_value in os.environ.items():
-            if not env_key.startswith('SERVICE_TOKEN_'):
+            if not env_key.startswith("SERVICE_TOKEN_"):
                 continue
 
             # Skip if it's the PREFIX variable
-            if env_key == 'SERVICE_TOKEN_PREFIX':
+            if env_key == "SERVICE_TOKEN_PREFIX":
                 continue
 
             # Extract service name from env key
             # SERVICE_TOKEN_MAIN_APP -> main-app
             # SERVICE_TOKEN_USER_SERVICE_PRIMARY -> user-service
-            parts = env_key.replace('SERVICE_TOKEN_', '').split('_')
+            parts = env_key.replace("SERVICE_TOKEN_", "").split("_")
 
             # Remove _PRIMARY, _SECONDARY suffixes if present
-            if parts[-1] in ('PRIMARY', 'SECONDARY', 'BACKUP'):
+            if parts[-1] in ("PRIMARY", "SECONDARY", "BACKUP"):
                 parts = parts[:-1]
 
             # Convert to lowercase, join with hyphens
-            service_name = '-'.join(parts).lower()
+            service_name = "-".join(parts).lower()
 
             # Validate token format
             if not env_value.startswith(self.token_prefix):
                 logger.warning(
-                    f"Token for service '{service_name}' does not start with "
-                    f"required prefix '{self.token_prefix}' - skipping"
+                    "Token for service '%s' does not start with required prefix '%s' - skipping",
+                    service_name, self.token_prefix
                 )
                 continue
 
@@ -134,7 +137,7 @@ class ServiceAuthenticator:
                 tokens[service_name] = []
 
             tokens[service_name].append(env_value)
-            logger.debug(f"Loaded token for service: {service_name}")
+            logger.debug("Loaded token for service: %s", service_name)
 
         if not tokens and self.enabled:
             logger.error(
@@ -166,9 +169,7 @@ class ServiceAuthenticator:
         if not self.enabled:
             logger.debug("Authentication disabled - allowing request without token")
             return ServiceIdentity(
-                name="unauthenticated",
-                token="none",
-                authenticated_at=datetime.utcnow()
+                name="unauthenticated", token="none", authenticated_at=datetime.utcnow()
             )
 
         # Check token is provided
@@ -179,23 +180,27 @@ class ServiceAuthenticator:
                 detail={
                     "error": "authentication_required",
                     "message": "Service token required. Provide X-Service-Token header.",
-                    "docs": "See SERVICE_AUTHENTICATION.md for integration guide"
-                }
+                    "docs": "See SERVICE_AUTHENTICATION.md for integration guide",
+                },
             )
 
         # Validate token prefix (prevents accidents with wrong secrets)
         if not token.startswith(self.token_prefix):
             logger.warning(
-                f"Authentication failed: Invalid token prefix "
-                f"(expected '{self.token_prefix}', got '{token[:10]}...')"
+                "Authentication failed: Invalid token prefix (expected '%s', got '%s...')",
+                self.token_prefix, token[:10]
             )
             raise HTTPException(
                 status_code=401,
                 detail={
                     "error": "invalid_token_format",
                     "message": f"Service token must start with '{self.token_prefix}'",
-                    "provided_prefix": token[:len(self.token_prefix)] if len(token) >= len(self.token_prefix) else token
-                }
+                    "provided_prefix": (
+                        token[: len(self.token_prefix)]
+                        if len(token) >= len(self.token_prefix)
+                        else token
+                    ),
+                },
             )
 
         # Verify token using constant-time comparison
@@ -204,26 +209,21 @@ class ServiceAuthenticator:
         if not service_name:
             # Token is valid format but not recognized
             logger.warning(
-                f"Authentication failed: Unrecognized token "
-                f"(prefix: {token[:15]}...)"
+                "Authentication failed: Unrecognized token (prefix: %s...)", token[:15]
             )
             raise HTTPException(
                 status_code=401,
                 detail={
                     "error": "invalid_token",
                     "message": "Service token not recognized. Check token is correct and service is configured.",
-                }
+                },
             )
 
         # Authentication successful
-        logger.info(f"Service authenticated: {service_name}")
-        logger.debug(f"Token used: {token[:20]}...")
+        logger.info("Service authenticated: %s", service_name)
+        logger.debug("Token used: %s...", token[:20])
 
-        return ServiceIdentity(
-            name=service_name,
-            token=token,
-            authenticated_at=datetime.utcnow()
-        )
+        return ServiceIdentity(name=service_name, token=token, authenticated_at=datetime.utcnow())
 
     def _verify_token_constant_time(self, provided_token: str) -> Optional[str]:
         """
@@ -288,10 +288,10 @@ class ServiceAuthenticator:
             }
         """
         return {
-            'enabled': self.enabled,
-            'token_prefix': self.token_prefix,
-            'services_count': len(self.service_tokens),
-            'services': self.get_configured_services()
+            "enabled": self.enabled,
+            "token_prefix": self.token_prefix,
+            "services_count": len(self.service_tokens),
+            "services": self.get_configured_services(),
         }
 
 

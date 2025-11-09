@@ -18,7 +18,10 @@ class FreeFaceEmailIntegration:
         await self.email_service.send_email(
             recipients=user_email,
             template="user_welcome",
-            data={"name": user_name, "verification_link": f"https://freeface.com/verify/{verification_token}"},
+            data={
+                "name": user_name,
+                "verification_link": f"https://freeface.com/verify/{verification_token}",
+            },
             priority=EmailPriority.HIGH,
         )
 

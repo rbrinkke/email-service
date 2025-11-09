@@ -1,5 +1,6 @@
-# File: Dockerfile.worker
-# Email Worker Container - Built from base image
+# File: Dockerfile.base
+# Base image for all email service containers
+# This image contains all dependencies and common application code
 FROM python:3.11-slim
 
 WORKDIR /opt/email
@@ -7,6 +8,7 @@ WORKDIR /opt/email
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python requirements
@@ -16,7 +18,6 @@ RUN pip install pyyaml
 
 # Copy all application code
 COPY email_system.py .
-COPY worker.py .
 COPY email_templates.py .
 COPY config/ config/
 COPY models/ models/
@@ -27,9 +28,4 @@ COPY workers/ workers/
 COPY templates/ templates/
 COPY utils/ utils/
 
-# Create non-root user
-RUN useradd -r -s /bin/false emailworker
-RUN chown -R emailworker:emailworker /opt/email
-USER emailworker
-
-CMD ["python", "worker.py"]
+# Note: No logs directory needed - all logs go to stdout/stderr for Docker

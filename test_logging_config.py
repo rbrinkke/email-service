@@ -15,14 +15,14 @@ Expected output:
 - Environment variables are respected
 """
 
+import logging
 import os
 import sys
-import logging
 
 # Set test environment variables
-os.environ['LOG_LEVEL'] = 'DEBUG'
-os.environ['ENVIRONMENT'] = 'development'
-os.environ['LOG_FORMAT'] = 'text'
+os.environ["LOG_LEVEL"] = "DEBUG"
+os.environ["ENVIRONMENT"] = "development"
+os.environ["LOG_FORMAT"] = "text"
 
 # Add current directory to path to import our modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -54,7 +54,7 @@ def test_log_levels():
     print("-" * 70)
 
     setup_logging()
-    logger = logging.getLogger('test_logger')
+    logger = logging.getLogger("test_logger")
 
     logger.debug("🔍 This is a DEBUG message")
     logger.info("ℹ️  This is an INFO message")
@@ -77,20 +77,20 @@ def test_different_loggers():
     setup_logging()
 
     # Application loggers (should show DEBUG)
-    app_logger = logging.getLogger('email_system')
+    app_logger = logging.getLogger("email_system")
     app_logger.debug("📧 email_system DEBUG (should be visible)")
     app_logger.info("📧 email_system INFO")
 
-    api_logger = logging.getLogger('api')
+    api_logger = logging.getLogger("api")
     api_logger.debug("🌐 api DEBUG (should be visible)")
     api_logger.info("🌐 api INFO")
 
     # Third-party loggers (should NOT show DEBUG due to WARNING level)
-    redis_logger = logging.getLogger('redis')
+    redis_logger = logging.getLogger("redis")
     redis_logger.debug("🔴 redis DEBUG (should NOT be visible - level is WARNING)")
     redis_logger.warning("🔴 redis WARNING (should be visible)")
 
-    asyncio_logger = logging.getLogger('asyncio')
+    asyncio_logger = logging.getLogger("asyncio")
     asyncio_logger.debug("⚡ asyncio DEBUG (should NOT be visible - level is WARNING)")
     asyncio_logger.warning("⚡ asyncio WARNING (should be visible)")
 
@@ -136,20 +136,20 @@ def test_environment_variables():
     # Test with INFO level
     print("\nTest 5a: Setting LOG_LEVEL=INFO (DEBUG should be hidden)")
     print("-" * 70)
-    os.environ['LOG_LEVEL'] = 'INFO'
+    os.environ["LOG_LEVEL"] = "INFO"
     setup_logging()
 
-    logger = logging.getLogger('env_test')
+    logger = logging.getLogger("env_test")
     logger.debug("🔍 DEBUG message (should NOT be visible with LOG_LEVEL=INFO)")
     logger.info("ℹ️  INFO message (should be visible)")
 
     # Test with DEBUG level
     print("\nTest 5b: Setting LOG_LEVEL=DEBUG (DEBUG should be visible)")
     print("-" * 70)
-    os.environ['LOG_LEVEL'] = 'DEBUG'
+    os.environ["LOG_LEVEL"] = "DEBUG"
     setup_logging()
 
-    logger = logging.getLogger('env_test2')
+    logger = logging.getLogger("env_test2")
     logger.debug("🔍 DEBUG message (should be visible with LOG_LEVEL=DEBUG)")
     logger.info("ℹ️  INFO message (should be visible)")
 
@@ -163,7 +163,7 @@ def test_yaml_config_exists():
     print("TEST 6: YAML Configuration File")
     print("=" * 70)
 
-    yaml_path = os.path.join(os.path.dirname(__file__), 'config', 'logging.yaml')
+    yaml_path = os.path.join(os.path.dirname(__file__), "config", "logging.yaml")
 
     if os.path.exists(yaml_path):
         print(f"✅ YAML config found: {yaml_path}")
@@ -171,7 +171,8 @@ def test_yaml_config_exists():
         # Try to load it
         try:
             import yaml
-            with open(yaml_path, 'r') as f:
+
+            with open(yaml_path, "r") as f:
                 config = yaml.safe_load(f)
 
             print(f"   - Formatters: {len(config.get('formatters', {}))}")
@@ -180,15 +181,15 @@ def test_yaml_config_exists():
 
             # Show configured application loggers
             print("\n   Application loggers configured:")
-            for logger_name in ['email_system', 'api', 'worker', 'scheduler', 'monitor']:
-                if logger_name in config.get('loggers', {}):
-                    level = config['loggers'][logger_name].get('level', 'N/A')
+            for logger_name in ["email_system", "api", "worker", "scheduler", "monitor"]:
+                if logger_name in config.get("loggers", {}):
+                    level = config["loggers"][logger_name].get("level", "N/A")
                     print(f"      - {logger_name}: {level}")
 
             print("\n   Third-party loggers configured:")
-            for logger_name in ['redis', 'asyncio', 'httpx', 'httpcore']:
-                if logger_name in config.get('loggers', {}):
-                    level = config['loggers'][logger_name].get('level', 'N/A')
+            for logger_name in ["redis", "asyncio", "httpx", "httpcore"]:
+                if logger_name in config.get("loggers", {}):
+                    level = config["loggers"][logger_name].get("level", "N/A")
                     print(f"      - {logger_name}: {level}")
 
             return True
@@ -228,6 +229,7 @@ def main():
         except Exception as e:
             print(f"\n❌ Test failed with exception: {e}")
             import traceback
+
             traceback.print_exc()
             results.append(False)
 

@@ -2,10 +2,10 @@
 # Service Audit Trail and Metrics Tracking
 # Provides Redis-based audit logging for service-to-service calls
 
-import logging
-from datetime import datetime, date
-from typing import Dict, Optional
 import json
+import logging
+from datetime import date, datetime
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class ServiceAuditTrail:
         service_name: str,
         endpoint: str,
         job_id: Optional[str] = None,
-        metadata: Optional[Dict] = None
+        metadata: Optional[Dict] = None,
     ):
         """
         Log a service call to Redis audit trail
@@ -85,7 +85,7 @@ class ServiceAuditTrail:
                 "endpoint": endpoint,
                 "timestamp": timestamp.isoformat(),
                 "job_id": job_id,
-                **(metadata or {})
+                **(metadata or {}),
             }
 
             # Store audit record for this job (if job_id provided)
@@ -99,13 +99,12 @@ class ServiceAuditTrail:
             await self._increment_metrics(service_name, endpoint, metadata)
 
             logger.debug(
-                f"Audit logged: service={service_name}, endpoint={endpoint}, "
-                f"job_id={job_id}"
+                "Audit logged: service=%s, endpoint=%s, job_id=%s", service_name, endpoint, job_id
             )
 
         except Exception as e:
             # Never let audit logging break the main flow
-            logger.error(f"Failed to log audit trail: {e}", exc_info=True)
+            logger.error("Failed to log audit trail: %s", e, exc_info=True)
 
     async def _store_job_audit(self, job_id: str, audit_record: Dict):
         """
@@ -120,19 +119,17 @@ class ServiceAuditTrail:
         # Store as Redis hash
         await self.redis_client.client.hset(
             key,
-            mapping={k: json.dumps(v) if isinstance(v, (dict, list)) else str(v)
-                    for k, v in audit_record.items()}
+            mapping={
+                k: json.dumps(v) if isinstance(v, (dict, list)) else str(v)
+                for k, v in audit_record.items()
+            },
         )
 
         # Set TTL: keep audit records for 30 days
         await self.redis_client.client.expire(key, 30 * 24 * 60 * 60)
 
     async def _log_service_call_timeline(
-        self,
-        service_name: str,
-        today: str,
-        timestamp: datetime,
-        endpoint: str
+        self, service_name: str, today: str, timestamp: datetime, endpoint: str
     ):
         """
         Add call to service's timeline (sorted set)
@@ -154,12 +151,7 @@ class ServiceAuditTrail:
         # Set TTL: keep daily call logs for 90 days
         await self.redis_client.client.expire(key, 90 * 24 * 60 * 60)
 
-    async def _increment_metrics(
-        self,
-        service_name: str,
-        endpoint: str,
-        metadata: Optional[Dict]
-    ):
+    async def _increment_metrics(self, service_name: str, endpoint: str, metadata: Optional[Dict]):
         """
         Increment service metrics counters
 
@@ -169,21 +161,16 @@ class ServiceAuditTrail:
             metadata: Call metadata
         """
         # Total calls for this service
-        await self.redis_client.client.incr(
-            f"service:metrics:{service_name}:total_calls"
-        )
+        await self.redis_client.client.incr(f"service:metrics:{service_name}:total_calls")
 
         # Calls per endpoint
-        await self.redis_client.client.incr(
-            f"service:metrics:{service_name}:{endpoint}"
-        )
+        await self.redis_client.client.incr(f"service:metrics:{service_name}:{endpoint}")
 
         # If this was an email send, increment email counter
-        if metadata and metadata.get('recipient_count'):
-            recipient_count = metadata['recipient_count']
+        if metadata and metadata.get("recipient_count"):
+            recipient_count = metadata["recipient_count"]
             await self.redis_client.client.incrby(
-                f"service:metrics:{service_name}:total_emails",
-                recipient_count
+                f"service:metrics:{service_name}:total_emails", recipient_count
             )
 
     async def get_job_audit(self, job_id: str) -> Optional[Dict]:
@@ -225,7 +212,7 @@ class ServiceAuditTrail:
             return parsed
 
         except Exception as e:
-            logger.error(f"Failed to get job audit: {e}")
+            logger.error("Failed to get job audit: %s", e)
             return None
 
     async def get_service_metrics(self, service_name: str) -> Dict:
@@ -275,11 +262,7 @@ class ServiceAuditTrail:
             # Scan for endpoint metric keys
             cursor = 0
             while True:
-                cursor, keys = await self.redis_client.client.scan(
-                    cursor,
-                    match=pattern,
-                    count=100
-                )
+                cursor, keys = await self.redis_client.client.scan(cursor, match=pattern, count=100)
                 endpoint_keys.extend(keys)
                 if cursor == 0:
                     break
@@ -289,10 +272,10 @@ class ServiceAuditTrail:
             for key in endpoint_keys:
                 # Extract endpoint from key
                 # service:metrics:main-app:/send -> /send
-                endpoint = key.split(':', 3)[-1]
+                endpoint = key.split(":", 3)[-1]
 
                 # Skip non-endpoint metrics
-                if endpoint in ('total_calls', 'total_emails'):
+                if endpoint in ("total_calls", "total_emails"):
                     continue
 
                 count = await self.redis_client.client.get(key)
@@ -302,11 +285,11 @@ class ServiceAuditTrail:
                 "total_calls": int(total_calls) if total_calls else 0,
                 "total_emails": int(total_emails) if total_emails else 0,
                 "calls_today": calls_today,
-                "endpoints": endpoints
+                "endpoints": endpoints,
             }
 
         except Exception as e:
-            logger.error(f"Failed to get service metrics: {e}")
+            logger.error("Failed to get service metrics: %s", e)
             return {}
 
     async def get_all_services_metrics(self) -> Dict[str, Dict]:
@@ -332,16 +315,12 @@ class ServiceAuditTrail:
 
             cursor = 0
             while True:
-                cursor, keys = await self.redis_client.client.scan(
-                    cursor,
-                    match=pattern,
-                    count=100
-                )
+                cursor, keys = await self.redis_client.client.scan(cursor, match=pattern, count=100)
 
                 for key in keys:
                     # Extract service name
                     # service:metrics:main-app:total_calls -> main-app
-                    parts = key.split(':')
+                    parts = key.split(":")
                     if len(parts) >= 3:
                         service_names.add(parts[2])
 
@@ -358,7 +337,7 @@ class ServiceAuditTrail:
             return all_metrics
 
         except Exception as e:
-            logger.error(f"Failed to get all services metrics: {e}")
+            logger.error("Failed to get all services metrics: %s", e)
             return {}
 
 

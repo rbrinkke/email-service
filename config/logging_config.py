@@ -44,7 +44,7 @@ def get_log_level() -> str:
         print(
             f"WARNING: Invalid LOG_LEVEL '{level}'. Defaulting to INFO. "
             f"Valid levels: {', '.join(valid_levels)}",
-            file=sys.stderr
+            file=sys.stderr,
         )
         return "INFO"
 
@@ -79,19 +79,19 @@ def load_yaml_config(config_path: Optional[Path] = None) -> dict:
         print(
             f"WARNING: Logging config file not found at {config_path}. "
             "Using basic configuration.",
-            file=sys.stderr
+            file=sys.stderr,
         )
         return get_basic_config()
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             config = yaml.safe_load(f)
             return config
     except Exception as e:
         print(
             f"ERROR: Failed to load logging config from {config_path}: {e}. "
             "Using basic configuration.",
-            file=sys.stderr
+            file=sys.stderr,
         )
         return get_basic_config()
 
@@ -109,106 +109,63 @@ def get_basic_config() -> dict:
     log_level = get_log_level()
 
     return {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'detailed': {
-                'format': '%(asctime)s - [%(name)s] - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
-                'datefmt': '%Y-%m-%d %H:%M:%S'
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "detailed": {
+                "format": "%(asctime)s - [%(name)s] - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
             },
-            'simple': {
-                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                'datefmt': '%Y-%m-%d %H:%M:%S'
-            }
-        },
-        'handlers': {
-            'stdout': {
-                'class': 'logging.StreamHandler',
-                'level': 'DEBUG',
-                'formatter': 'detailed',
-                'stream': 'ext://sys.stdout'
+            "simple": {
+                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
             },
-            'stderr': {
-                'class': 'logging.StreamHandler',
-                'level': 'ERROR',
-                'formatter': 'detailed',
-                'stream': 'ext://sys.stderr'
-            }
         },
-        'loggers': {
+        "handlers": {
+            "stdout": {
+                "class": "logging.StreamHandler",
+                "level": "DEBUG",
+                "formatter": "detailed",
+                "stream": "ext://sys.stdout",
+            },
+            "stderr": {
+                "class": "logging.StreamHandler",
+                "level": "ERROR",
+                "formatter": "detailed",
+                "stream": "ext://sys.stderr",
+            },
+        },
+        "loggers": {
             # Uvicorn loggers - prevent duplication
-            'uvicorn.error': {
-                'level': log_level,
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
+            "uvicorn.error": {
+                "level": log_level,
+                "handlers": ["stdout", "stderr"],
+                "propagate": False,
             },
-            'uvicorn.access': {
-                'level': 'WARNING',  # We'll implement custom access logging
-                'handlers': [],
-                'propagate': False
+            "uvicorn.access": {
+                "level": "WARNING",  # We'll implement custom access logging
+                "handlers": [],
+                "propagate": False,
             },
             # Application loggers
-            'email_system': {
-                'level': log_level,
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
+            "email_system": {
+                "level": log_level,
+                "handlers": ["stdout", "stderr"],
+                "propagate": False,
             },
-            'api': {
-                'level': log_level,
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
-            },
-            'worker': {
-                'level': log_level,
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
-            },
-            'config': {
-                'level': log_level,
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
-            },
-            'services': {
-                'level': log_level,
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
-            },
-            'providers': {
-                'level': log_level,
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
-            },
-            'models': {
-                'level': log_level,
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
-            },
+            "api": {"level": log_level, "handlers": ["stdout", "stderr"], "propagate": False},
+            "worker": {"level": log_level, "handlers": ["stdout", "stderr"], "propagate": False},
+            "config": {"level": log_level, "handlers": ["stdout", "stderr"], "propagate": False},
+            "services": {"level": log_level, "handlers": ["stdout", "stderr"], "propagate": False},
+            "providers": {"level": log_level, "handlers": ["stdout", "stderr"], "propagate": False},
+            "models": {"level": log_level, "handlers": ["stdout", "stderr"], "propagate": False},
             # Third-party noise control
-            'redis': {
-                'level': 'WARNING',
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
-            },
-            'asyncio': {
-                'level': 'WARNING',
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
-            },
-            'httpx': {
-                'level': 'WARNING',
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
-            },
-            'httpcore': {
-                'level': 'WARNING',
-                'handlers': ['stdout', 'stderr'],
-                'propagate': False
-            }
+            "redis": {"level": "WARNING", "handlers": ["stdout", "stderr"], "propagate": False},
+            "asyncio": {"level": "WARNING", "handlers": ["stdout", "stderr"], "propagate": False},
+            "httpx": {"level": "WARNING", "handlers": ["stdout", "stderr"], "propagate": False},
+            "httpcore": {"level": "WARNING", "handlers": ["stdout", "stderr"], "propagate": False},
         },
-        'root': {
-            'level': log_level,
-            'handlers': ['stdout', 'stderr']
-        }
+        "root": {"level": log_level, "handlers": ["stdout", "stderr"]},
     }
 
 
@@ -229,12 +186,12 @@ def apply_environment_overrides(config: dict) -> dict:
     global_log_level = get_log_level()
 
     # Apply to root logger
-    if 'root' in config:
-        config['root']['level'] = global_log_level
+    if "root" in config:
+        config["root"]["level"] = global_log_level
 
     # Apply to all loggers that don't have explicit overrides
-    if 'loggers' in config:
-        for logger_name in config['loggers']:
+    if "loggers" in config:
+        for logger_name in config["loggers"]:
             # Check for logger-specific override
             env_var = f"LOGGER_LEVEL_{logger_name.replace('.', '_').upper()}"
             override_level = os.getenv(env_var)
@@ -242,15 +199,24 @@ def apply_environment_overrides(config: dict) -> dict:
             if override_level:
                 override_level = override_level.upper()
                 if override_level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
-                    config['loggers'][logger_name]['level'] = override_level
+                    config["loggers"][logger_name]["level"] = override_level
                     print(
                         f"Applied environment override: {logger_name} logger set to {override_level}",
-                        file=sys.stderr
+                        file=sys.stderr,
                     )
             else:
                 # Apply global level to application loggers
-                if logger_name in ['email_system', 'api', 'worker', 'config', 'services', 'providers', 'models', 'uvicorn.error']:
-                    config['loggers'][logger_name]['level'] = global_log_level
+                if logger_name in [
+                    "email_system",
+                    "api",
+                    "worker",
+                    "config",
+                    "services",
+                    "providers",
+                    "models",
+                    "uvicorn.error",
+                ]:
+                    config["loggers"][logger_name]["level"] = global_log_level
 
     return config
 
@@ -304,8 +270,8 @@ def setup_logging(config_path: Optional[Path] = None) -> None:
     # Log startup info
     logger = logging.getLogger(__name__)
     logger.info(
-        f"Logging configured - Environment: {env}, Level: {log_level}, "
-        f"Config source: {'YAML' if config_path else 'Basic'}"
+        "Logging configured - Environment: %s, Level: %s, Config source: %s",
+        env, log_level, 'YAML' if config_path else 'Basic'
     )
     logger.debug("Debug logging is enabled")
 
@@ -328,10 +294,10 @@ def test_logging():
     logger.critical("CRITICAL: This is a critical message")
 
     # Test different loggers
-    for logger_name in ['email_system', 'api', 'worker', 'redis']:
+    for logger_name in ["email_system", "api", "worker", "redis"]:
         test_logger = logging.getLogger(logger_name)
-        test_logger.info(f"Testing logger: {logger_name}")
-        test_logger.debug(f"Debug message from: {logger_name}")
+        test_logger.info("Testing logger: %s", logger_name)
+        test_logger.debug("Debug message from: %s", logger_name)
 
 
 if __name__ == "__main__":

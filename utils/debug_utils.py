@@ -19,11 +19,11 @@ Usage:
 """
 
 import functools
+import inspect
 import logging
 import time
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Optional
-import inspect
 
 
 def get_logger_for_module(module_name: str) -> logging.Logger:
@@ -62,25 +62,18 @@ def log_function_call(func: Callable) -> Callable:
         # Sanitize sensitive parameters
         sanitized_args = _sanitize_params(bound_args.arguments)
 
-        logger.debug(
-            f"→ Calling {func.__name__}({_format_params(sanitized_args)})"
-        )
+        logger.debug("→ Calling %s(%s)", func.__name__, _format_params(sanitized_args))
 
         start_time = time.time()
         try:
             result = await func(*args, **kwargs)
             elapsed = time.time() - start_time
 
-            logger.debug(
-                f"← {func.__name__} completed in {elapsed:.3f}s"
-            )
+            logger.debug("← %s completed in %.3fs", func.__name__, elapsed)
             return result
         except Exception as e:
             elapsed = time.time() - start_time
-            logger.error(
-                f"✗ {func.__name__} failed after {elapsed:.3f}s: {e}",
-                exc_info=True
-            )
+            logger.error("✗ %s failed after %.3fs: %s", func.__name__, elapsed, e, exc_info=True)
             raise
 
     @functools.wraps(func)
@@ -92,25 +85,18 @@ def log_function_call(func: Callable) -> Callable:
 
         sanitized_args = _sanitize_params(bound_args.arguments)
 
-        logger.debug(
-            f"→ Calling {func.__name__}({_format_params(sanitized_args)})"
-        )
+        logger.debug("→ Calling %s(%s)", func.__name__, _format_params(sanitized_args))
 
         start_time = time.time()
         try:
             result = func(*args, **kwargs)
             elapsed = time.time() - start_time
 
-            logger.debug(
-                f"← {func.__name__} completed in {elapsed:.3f}s"
-            )
+            logger.debug("← %s completed in %.3fs", func.__name__, elapsed)
             return result
         except Exception as e:
             elapsed = time.time() - start_time
-            logger.error(
-                f"✗ {func.__name__} failed after {elapsed:.3f}s: {e}",
-                exc_info=True
-            )
+            logger.error("✗ %s failed after %.3fs: %s", func.__name__, elapsed, e, exc_info=True)
             raise
 
     # Return appropriate wrapper based on function type
@@ -136,24 +122,23 @@ def log_timing(operation_name: str, logger: Optional[logging.Logger] = None):
     if logger is None:
         logger = logging.getLogger(__name__)
 
-    logger.debug(f"⏱ Starting: {operation_name}")
+    logger.debug("⏱ Starting: %s", operation_name)
     start_time = time.time()
 
     try:
         yield
         elapsed = time.time() - start_time
-        logger.debug(f"✓ {operation_name} completed in {elapsed:.3f}s")
+        logger.debug("✓ %s completed in %.3fs", operation_name, elapsed)
     except Exception as e:
         elapsed = time.time() - start_time
-        logger.error(
-            f"✗ {operation_name} failed after {elapsed:.3f}s: {e}",
-            exc_info=True
-        )
+        logger.error("✗ %s failed after %.3fs: %s", operation_name, elapsed, e, exc_info=True)
         raise
 
 
 @contextmanager
-def debug_context(context_name: str, context_data: Dict[str, Any], logger: Optional[logging.Logger] = None):
+def debug_context(
+    context_name: str, context_data: Dict[str, Any], logger: Optional[logging.Logger] = None
+):
     """
     Context manager to log entry/exit with contextual data.
 
@@ -173,22 +158,23 @@ def debug_context(context_name: str, context_data: Dict[str, Any], logger: Optio
 
     sanitized_data = _sanitize_params(context_data)
 
-    logger.debug(
-        f"▼ Entering {context_name}: {_format_params(sanitized_data)}"
-    )
+    logger.debug("▼ Entering %s: %s", context_name, _format_params(sanitized_data))
 
     try:
         yield
-        logger.debug(f"▲ Exiting {context_name}: SUCCESS")
+        logger.debug("▲ Exiting %s: SUCCESS", context_name)
     except Exception as e:
-        logger.error(
-            f"▲ Exiting {context_name}: FAILED - {e}",
-            exc_info=True
-        )
+        logger.error("▲ Exiting %s: FAILED - %s", context_name, e, exc_info=True)
         raise
 
 
-def log_state_change(logger: logging.Logger, entity: str, old_state: Any, new_state: Any, context: Optional[Dict] = None):
+def log_state_change(
+    logger: logging.Logger,
+    entity: str,
+    old_state: Any,
+    new_state: Any,
+    context: Optional[Dict] = None,
+):
     """
     Log a state change with context.
 
@@ -209,9 +195,7 @@ def log_state_change(logger: logging.Logger, entity: str, old_state: Any, new_st
         sanitized = _sanitize_params(context)
         context_str = f" [{_format_params(sanitized)}]"
 
-    logger.debug(
-        f"State change: {entity} {old_state} → {new_state}{context_str}"
-    )
+    logger.debug("State change: %s %s → %s%s", entity, old_state, new_state, context_str)
 
 
 def log_data_structure(logger: logging.Logger, name: str, data: Any, max_depth: int = 3):
@@ -231,11 +215,12 @@ def log_data_structure(logger: logging.Logger, name: str, data: Any, max_depth: 
     """
     try:
         import json
+
         # Try to convert to JSON for nice formatting
-        if hasattr(data, 'dict'):
+        if hasattr(data, "dict"):
             # Pydantic model
             data_dict = data.dict()
-        elif hasattr(data, '__dict__'):
+        elif hasattr(data, "__dict__"):
             # Regular object
             data_dict = data.__dict__
         else:
@@ -244,10 +229,10 @@ def log_data_structure(logger: logging.Logger, name: str, data: Any, max_depth: 
         sanitized = _sanitize_params(data_dict) if isinstance(data_dict, dict) else data_dict
         formatted = json.dumps(sanitized, indent=2, default=str)
 
-        logger.debug(f"{name}:\n{formatted}")
+        logger.debug("%s:\n%s", name, formatted)
     except Exception as e:
         # Fallback to repr if JSON fails
-        logger.debug(f"{name}: {repr(data)[:500]}")  # Limit to 500 chars
+        logger.debug("%s: %s", name, repr(data)[:500])  # Limit to 500 chars
 
 
 def _sanitize_params(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -256,7 +241,7 @@ def _sanitize_params(params: Dict[str, Any]) -> Dict[str, Any]:
 
     Redacts fields like: password, api_key, secret, token, credential
     """
-    sensitive_keys = {'password', 'api_key', 'secret', 'token', 'credential', 'auth'}
+    sensitive_keys = {"password", "api_key", "secret", "token", "credential", "auth"}
 
     sanitized = {}
     for key, value in params.items():
@@ -266,17 +251,19 @@ def _sanitize_params(params: Dict[str, Any]) -> Dict[str, Any]:
         is_sensitive = any(sensitive in key_lower for sensitive in sensitive_keys)
 
         if is_sensitive:
-            sanitized[key] = '***REDACTED***'
+            sanitized[key] = "***REDACTED***"
         elif isinstance(value, dict):
             # Recursively sanitize nested dicts
             sanitized[key] = _sanitize_params(value)
         elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], dict):
             # Sanitize list of dicts
-            sanitized[key] = [_sanitize_params(item) if isinstance(item, dict) else item for item in value]
+            sanitized[key] = [
+                _sanitize_params(item) if isinstance(item, dict) else item for item in value
+            ]
         else:
             # Truncate very long values
             if isinstance(value, str) and len(value) > 200:
-                sanitized[key] = value[:200] + '...[truncated]'
+                sanitized[key] = value[:200] + "...[truncated]"
             else:
                 sanitized[key] = value
 
@@ -293,7 +280,7 @@ def _format_params(params: Dict[str, Any]) -> str:
     formatted_parts = []
     for key, value in params.items():
         # Skip 'self' parameter
-        if key == 'self':
+        if key == "self":
             continue
 
         if isinstance(value, str):
@@ -308,7 +295,9 @@ def _format_params(params: Dict[str, Any]) -> str:
     return ", ".join(formatted_parts)
 
 
-def log_redis_operation(logger: logging.Logger, operation: str, key: str, details: Optional[Dict] = None):
+def log_redis_operation(
+    logger: logging.Logger, operation: str, key: str, details: Optional[Dict] = None
+):
     """
     Log Redis operation for debugging queue and caching issues.
 
@@ -326,7 +315,7 @@ def log_redis_operation(logger: logging.Logger, operation: str, key: str, detail
         sanitized = _sanitize_params(details)
         details_str = f" {_format_params(sanitized)}"
 
-    logger.debug(f"Redis {operation}: {key}{details_str}")
+    logger.debug("Redis %s: %s%s", operation, key, details_str)
 
 
 def log_provider_operation(logger: logging.Logger, provider: str, operation: str, details: Dict):
@@ -343,4 +332,4 @@ def log_provider_operation(logger: logging.Logger, provider: str, operation: str
         details: Operation details
     """
     sanitized = _sanitize_params(details)
-    logger.debug(f"Provider [{provider}] {operation}: {_format_params(sanitized)}")
+    logger.debug("Provider [%s] %s: %s", provider, operation, _format_params(sanitized))
