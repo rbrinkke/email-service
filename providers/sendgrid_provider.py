@@ -26,11 +26,16 @@ class SendGridProvider(EmailProviderBase):
         if self.session is None or self.session.closed:
             self.session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=30),
-                headers={"Authorization": f'Bearer {self.config["api_key"]}', "Content-Type": "application/json"},
+                headers={
+                    "Authorization": f'Bearer {self.config["api_key"]}',
+                    "Content-Type": "application/json",
+                },
             )
         return self.session
 
-    @backoff.on_exception(backoff.expo, (aiohttp.ClientError, asyncio.TimeoutError), max_tries=3, max_time=30)
+    @backoff.on_exception(
+        backoff.expo, (aiohttp.ClientError, asyncio.TimeoutError), max_tries=3, max_time=30
+    )
     async def _send_email_impl(self, job: EmailJob) -> bool:
         """Send email via SendGrid API"""
         session = await self._get_session()

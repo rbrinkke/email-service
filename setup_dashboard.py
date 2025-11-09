@@ -192,17 +192,19 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </body>
 </html>"""
 
+
 def setup_dashboard():
     """Create the dashboard template file"""
     # Create templates directory if it doesn't exist
-    os.makedirs('/opt/email/templates', exist_ok=True)
-    
+    os.makedirs("/opt/email/templates", exist_ok=True)
+
     # Write the dashboard HTML file
-    with open('/opt/email/templates/dashboard.html', 'w') as f:
+    with open("/opt/email/templates/dashboard.html", "w") as f:
         f.write(DASHBOARD_HTML)
-    
+
     print("✅ Dashboard template created successfully!")
     print("📁 File: /opt/email/templates/dashboard.html")
+
 
 if __name__ == "__main__":
     setup_dashboard()

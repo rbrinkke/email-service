@@ -2,30 +2,31 @@
 # Email Template Management
 
 import os
+from typing import Any, Dict, List
+
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from typing import Dict, Any, List
+
 
 class EmailTemplateManager:
     """Manages email templates with Jinja2"""
-    
+
     def __init__(self, template_dir: str = "/opt/email/templates"):
         self.template_dir = template_dir
         self.env = Environment(
-            loader=FileSystemLoader(template_dir),
-            autoescape=select_autoescape(['html', 'xml'])
+            loader=FileSystemLoader(template_dir), autoescape=select_autoescape(["html", "xml"])
         )
-        
+
         # Ensure template directory exists
         os.makedirs(template_dir, exist_ok=True)
-        
+
         # Create default templates
         self._create_default_templates()
-    
+
     def _create_default_templates(self):
         """Create default email templates"""
-        
+
         templates = {
-            'user_welcome.html': """
+            "user_welcome.html": """
 <!DOCTYPE html>
 <html>
 <head>
@@ -79,8 +80,7 @@ class EmailTemplateManager:
 </body>
 </html>
             """,
-            
-            'password_reset.html': """
+            "password_reset.html": """
 <!DOCTYPE html>
 <html>
 <head>
@@ -134,8 +134,7 @@ class EmailTemplateManager:
 </body>
 </html>
             """,
-            
-            'group_invitation.html': """
+            "group_invitation.html": """
 <!DOCTYPE html>
 <html>
 <head>
@@ -195,8 +194,7 @@ class EmailTemplateManager:
 </body>
 </html>
             """,
-            
-            'new_message.html': """
+            "new_message.html": """
 <!DOCTYPE html>
 <html>
 <head>
@@ -250,8 +248,7 @@ class EmailTemplateManager:
 </body>
 </html>
             """,
-            
-            'weekly_digest.html': """
+            "weekly_digest.html": """
 <!DOCTYPE html>
 <html>
 <head>
@@ -319,20 +316,20 @@ class EmailTemplateManager:
     </div>
 </body>
 </html>
-            """
+            """,
         }
-        
+
         # Write template files
         for filename, content in templates.items():
             filepath = os.path.join(self.template_dir, filename)
-            with open(filepath, 'w') as f:
+            with open(filepath, "w") as f:
                 f.write(content.strip())
-    
+
     def render_template(self, template_name: str, data: Dict[str, Any]) -> str:
         """Render email template with data"""
         template = self.env.get_template(template_name)
         return template.render(**data)
-    
+
     def get_available_templates(self) -> List[str]:
         """Get list of available templates"""
-        return [f for f in os.listdir(self.template_dir) if f.endswith('.html')]
+        return [f for f in os.listdir(self.template_dir) if f.endswith(".html")]

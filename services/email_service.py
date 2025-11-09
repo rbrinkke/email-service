@@ -10,8 +10,8 @@ from typing import Dict, List, Optional, Union
 from config.email_config import EmailConfig
 from models.email_models import EmailJob, EmailPriority, EmailProvider
 from redis_client_lib.redis_client import RedisEmailClient
+from utils.debug_utils import debug_context, log_data_structure, log_state_change, log_timing
 from workers.email_worker import EmailWorker
-from utils.debug_utils import log_timing, debug_context, log_state_change, log_data_structure
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,9 @@ class EmailService:
         self.redis_client = RedisEmailClient(config)
         self.workers = []
 
-        logger.debug(f"EmailService initialized with config: redis={config.redis_host}:{config.redis_port}")
+        logger.debug(
+            "EmailService initialized with config: redis=%s:%s", config.redis_host, config.redis_port
+        )
 
     async def initialize(self):
         """Initialize the email service"""
@@ -34,7 +36,9 @@ class EmailService:
             await self.redis_client.connect()
 
         logger.info("Email service initialized and connected to Redis")
-        logger.debug(f"Redis connection established: {self.config.redis_host}:{self.config.redis_port}")
+        logger.debug(
+            "Redis connection established: %s:%s", self.config.redis_host, self.config.redis_port
+        )
 
     async def send_email(
         self,
@@ -64,43 +68,51 @@ class EmailService:
 
         # Log the incoming request at DEBUG level
         logger.debug(
-            f"send_email called: recipients={recipients}, template={template}, "
-            f"priority={priority.value}, provider={provider.value}, "
-            f"scheduled={scheduled_at is not None}"
+            "send_email called: recipients=%s, template=%s, priority=%s, provider=%s, scheduled=%s",
+            recipients, template, priority.value, provider.value, scheduled_at is not None
         )
 
         # Expand group recipients
-        with log_timing(f"expand_recipients_{recipients if isinstance(recipients, str) else 'list'}", logger):
+        with log_timing(
+            f"expand_recipients_{recipients if isinstance(recipients, str) else 'list'}", logger
+        ):
             recipients = await self._expand_recipients(recipients)
 
-        logger.debug(f"Recipients expanded to {len(recipients)} email(s)")
+        logger.debug("Recipients expanded to %s email(s)", len(recipients))
 
         # Create email job
         job = EmailJob(
-            to=recipients, template=template, data=data, priority=priority, provider=provider, scheduled_at=scheduled_at
+            to=recipients,
+            template=template,
+            data=data,
+            priority=priority,
+            provider=provider,
+            scheduled_at=scheduled_at,
         )
 
-        logger.debug(f"Email job created: {job.job_id}")
+        logger.debug("Email job created: %s", job.job_id)
 
         # Log job details at DEBUG level
         if logger.isEnabledFor(logging.DEBUG):
-            log_data_structure(logger, f"EmailJob {job.job_id}", job)
+            log_data_structure(logger, "EmailJob %s" % job.job_id, job)
 
         # Queue the job
         if scheduled_at and scheduled_at > datetime.utcnow():
             # Schedule for later
-            logger.debug(f"Scheduling email {job.job_id} for {scheduled_at}")
+            logger.debug("Scheduling email %s for %s", job.job_id, scheduled_at)
             await self._schedule_email(job)
-            logger.info(f"Email scheduled: {job.job_id}, delivery at: {scheduled_at}")
+            logger.info("Email scheduled: %s, delivery at: %s", job.job_id, scheduled_at)
         else:
             # Queue immediately
-            logger.debug(f"Queueing email {job.job_id} to {priority.value} queue")
+            logger.debug("Queueing email %s to %s queue", job.job_id, priority.value)
 
             with log_timing(f"enqueue_{priority.value}", logger):
                 stream_id = await self.redis_client.enqueue_email(job)
 
-            logger.debug(f"Email queued with stream_id: {stream_id}")
-            logger.info(f"Email queued: {job.job_id}, priority: {priority.value}, recipients: {len(job.to)}")
+            logger.debug("Email queued with stream_id: %s", stream_id)
+            logger.info(
+                "Email queued: %s, priority: %s, recipients: %s", job.job_id, priority.value, len(job.to)
+            )
 
         return job.job_id
 
@@ -108,40 +120,42 @@ class EmailService:
         """Expand group identifiers to email addresses"""
         if isinstance(recipients, list):
             # Already a list of emails
-            logger.debug(f"Recipients already a list of {len(recipients)} email(s)")
+            logger.debug("Recipients already a list of %s email(s)", len(recipients))
             return recipients
 
         if recipients.startswith("group:"):
             # Expand group to member emails
             group_id = recipients[6:]  # Remove "group:" prefix
 
-            logger.debug(f"Expanding group: {group_id}")
+            logger.debug("Expanding group: %s", group_id)
 
             with log_timing(f"redis_lrange_group_{group_id}", logger):
-                member_emails = await self.redis_client.redis.lrange(f"group:{group_id}:emails", 0, -1)
+                member_emails = await self.redis_client.redis.lrange(
+                    f"group:{group_id}:emails", 0, -1
+                )
 
-            logger.debug(f"Group {group_id} has {len(member_emails)} member(s)")
+            logger.debug("Group %s has %s member(s)", group_id, len(member_emails))
 
             # Remove excluded members
             with log_timing(f"redis_lrange_excluded_{group_id}", logger):
                 excluded = await self.redis_client.redis.lrange(f"group:{group_id}:excluded", 0, -1)
 
             if excluded:
-                logger.debug(f"Group {group_id} has {len(excluded)} excluded member(s)")
+                logger.debug("Group %s has %s excluded member(s)", group_id, len(excluded))
                 filtered = [email for email in member_emails if email not in excluded]
-                logger.debug(f"After filtering: {len(filtered)} recipient(s)")
+                logger.debug("After filtering: %s recipient(s)", len(filtered))
                 return filtered
 
             return member_emails
 
-        logger.debug(f"Single recipient: {recipients}")
+        logger.debug("Single recipient: %s", recipients)
         return [recipients]  # Single email
 
     async def _schedule_email(self, job: EmailJob):
         """Schedule email for future delivery"""
         timestamp = int(job.scheduled_at.timestamp())
 
-        logger.debug(f"Scheduling job {job.job_id} for timestamp {timestamp} ({job.scheduled_at})")
+        logger.debug("Scheduling job %s for timestamp %s (%s)", job.job_id, timestamp, job.scheduled_at)
 
         with log_timing(f"redis_zadd_scheduled_{job.job_id}", logger):
             await self.redis_client.redis.zadd("email:scheduled", {job.job_id: timestamp})
@@ -149,26 +163,26 @@ class EmailService:
         with log_timing(f"redis_set_job_{job.job_id}", logger):
             await self.redis_client.redis.set(f"email:job:{job.job_id}", job.json(), ex=86400 * 7)
 
-        logger.debug(f"Job {job.job_id} scheduled successfully")
+        logger.debug("Job %s scheduled successfully", job.job_id)
 
     async def start_workers(self, worker_count: int = 3):
         """Start email workers"""
-        logger.info(f"Starting {worker_count} email worker(s)...")
+        logger.info("Starting %s email worker(s)...", worker_count)
 
         for i in range(worker_count):
             worker_id = f"worker_{i}"
 
-            logger.debug(f"Creating worker: {worker_id}")
+            logger.debug("Creating worker: %s", worker_id)
 
             worker = EmailWorker(worker_id, self.config, self.redis_client)
             task = asyncio.create_task(worker.start())
             self.workers.append((worker, task))
 
-            logger.debug(f"Worker task created for {worker_id}")
-            logger.info(f"Created worker task for {worker_id}")
+            logger.debug("Worker task created for %s", worker_id)
+            logger.info("Created worker task for %s", worker_id)
 
-        logger.info(f"Started {worker_count} email workers")
-        logger.debug(f"Active workers: {[w.worker_id for w, _ in self.workers]}")
+        logger.info("Started %s email workers", worker_count)
+        logger.debug("Active workers: %s", [w.worker_id for w, _ in self.workers])
 
     async def get_stats(self) -> Dict:
         """Get email system statistics"""
@@ -177,7 +191,7 @@ class EmailService:
         with log_timing("get_stats", logger):
             stats = await self.redis_client.get_stats()
 
-        logger.debug(f"Stats retrieved: {stats}")
+        logger.debug("Stats retrieved: %s", stats)
 
         return stats
 
@@ -186,10 +200,10 @@ class EmailService:
         logger.info("Shutting down email service...")
 
         # Stop workers
-        logger.debug(f"Stopping {len(self.workers)} worker(s)...")
+        logger.debug("Stopping %s worker(s)...", len(self.workers))
 
         for worker, task in self.workers:
-            logger.debug(f"Stopping worker: {worker.worker_id}")
+            logger.debug("Stopping worker: %s", worker.worker_id)
             worker.running = False
             task.cancel()
 

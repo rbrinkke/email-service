@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from config.logging_config import setup_logging
-from email_system import EmailService, EmailConfig
+from email_system import EmailConfig, EmailService
 from services.audit_service import audit_trail
 
 # Configure logging using centralized configuration
@@ -27,10 +27,10 @@ templates = Jinja2Templates(directory="templates")
 
 # Initialize email service for monitoring
 config = EmailConfig(
-    redis_host=os.getenv('REDIS_HOST', '10.10.1.21'),
-    redis_port=int(os.getenv('REDIS_PORT', 6379))
+    redis_host=os.getenv("REDIS_HOST", "10.10.1.21"), redis_port=int(os.getenv("REDIS_PORT", 6379))
 )
 email_service = EmailService(config)
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -42,73 +42,76 @@ async def startup_event():
 
     logger.info("Email monitoring dashboard started")
 
+
 @app.on_event("shutdown")
 async def shutdown_event():
     await email_service.shutdown()
     logger.info("Email monitoring dashboard stopped")
 
+
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Main monitoring dashboard"""
     stats = await email_service.get_stats()
-    
+
     # Calculate additional metrics
     total_queued = (
-        int(stats.get('queue_high', 0)) +
-        int(stats.get('queue_medium', 0)) +
-        int(stats.get('queue_low', 0))
+        int(stats.get("queue_high", 0))
+        + int(stats.get("queue_medium", 0))
+        + int(stats.get("queue_low", 0))
     )
-    
-    sent_today = int(stats.get('sent', 0))
-    failed_today = int(stats.get('failed', 0))
+
+    sent_today = int(stats.get("sent", 0))
+    failed_today = int(stats.get("failed", 0))
     success_rate = (sent_today / max(1, sent_today + failed_today)) * 100
-    
+
     # Rate limit status
     rate_status = {}
     for provider, limits in config.rate_limits.items():
-        tokens = stats.get(f'rate_{provider}_tokens', 'N/A')
-        if tokens != 'N/A':
-            utilization = (1 - int(tokens) / limits['bucket_size']) * 100
+        tokens = stats.get(f"rate_{provider}_tokens", "N/A")
+        if tokens != "N/A":
+            utilization = (1 - int(tokens) / limits["bucket_size"]) * 100
             rate_status[provider] = {
-                'tokens': tokens,
-                'limit': limits['bucket_size'],
-                'utilization': f"{utilization:.1f}%"
+                "tokens": tokens,
+                "limit": limits["bucket_size"],
+                "utilization": f"{utilization:.1f}%",
             }
         else:
             rate_status[provider] = {
-                'tokens': 'N/A',
-                'limit': limits['bucket_size'],
-                'utilization': 'N/A'
+                "tokens": "N/A",
+                "limit": limits["bucket_size"],
+                "utilization": "N/A",
             }
-    
+
     dashboard_data = {
-        'total_queued': total_queued,
-        'queue_high': stats.get('queue_high', 0),
-        'queue_medium': stats.get('queue_medium', 0),
-        'queue_low': stats.get('queue_low', 0),
-        'sent_today': sent_today,
-        'failed_today': failed_today,
-        'success_rate': f"{success_rate:.1f}%",
-        'rate_status': rate_status,
-        'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        "total_queued": total_queued,
+        "queue_high": stats.get("queue_high", 0),
+        "queue_medium": stats.get("queue_medium", 0),
+        "queue_low": stats.get("queue_low", 0),
+        "sent_today": sent_today,
+        "failed_today": failed_today,
+        "success_rate": f"{success_rate:.1f}%",
+        "rate_status": rate_status,
+        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
-    
+
     return templates.TemplateResponse(
-        "dashboard.html",
-        {"request": request, "data": dashboard_data}
+        "dashboard.html", {"request": request, "data": dashboard_data}
     )
+
 
 @app.get("/api/stats")
 async def api_stats():
     """JSON API for real-time stats"""
     return await email_service.get_stats()
 
+
 @app.get("/api/dead-letter")
 async def dead_letter_queue():
     """Get dead letter queue contents"""
     redis = email_service.redis_client.redis
     dead_letters = await redis.lrange("email:dead_letter", 0, 50)
-    
+
     jobs = []
     for job_data in dead_letters:
         try:
@@ -116,8 +119,9 @@ async def dead_letter_queue():
             jobs.append(job)
         except json.JSONDecodeError:
             continue
-    
+
     return {"dead_letter_jobs": jobs, "count": len(jobs)}
+
 
 @app.get("/api/service-metrics")
 async def service_metrics():
@@ -151,16 +155,17 @@ async def service_metrics():
         return {
             "services": metrics,
             "total_services": len(metrics),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Failed to get service metrics: {e}")
+        logger.error("Failed to get service metrics: %s", e)
         return {
             "services": {},
             "total_services": 0,
             "error": str(e),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
+
 
 @app.get("/api/service-metrics/{service_name}")
 async def service_metrics_detail(service_name: str):
@@ -179,22 +184,19 @@ async def service_metrics_detail(service_name: str):
             return {
                 "service": service_name,
                 "error": "Service not found or no metrics available",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         return {
             "service": service_name,
             "metrics": metrics,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
     except Exception as e:
-        logger.error(f"Failed to get metrics for service {service_name}: {e}")
-        return {
-            "service": service_name,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
+        logger.error("Failed to get metrics for service %s: %s", service_name, e)
+        return {"service": service_name, "error": str(e), "timestamp": datetime.now().isoformat()}
+
 
 @app.get("/api/audit/{job_id}")
 async def job_audit(job_id: str):
@@ -226,20 +228,16 @@ async def job_audit(job_id: str):
                 "job_id": job_id,
                 "audit": None,
                 "error": "Audit record not found (job may be older than 30 days)",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
-        return {
-            "job_id": job_id,
-            "audit": audit,
-            "timestamp": datetime.now().isoformat()
-        }
+        return {"job_id": job_id, "audit": audit, "timestamp": datetime.now().isoformat()}
 
     except Exception as e:
-        logger.error(f"Failed to get audit for job {job_id}: {e}")
+        logger.error("Failed to get audit for job %s: %s", job_id, e)
         return {
             "job_id": job_id,
             "audit": None,
             "error": str(e),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }

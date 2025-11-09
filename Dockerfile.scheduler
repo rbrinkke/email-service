@@ -1,5 +1,5 @@
 # File: Dockerfile.scheduler
-# Email Scheduler
+# Email Scheduler Container - Built from base image
 FROM python:3.11-slim
 
 WORKDIR /opt/email
@@ -9,12 +9,12 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copy and install Python requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install pyyaml
 
-# Copy application code
+# Copy all application code
 COPY email_system.py .
 COPY scheduler.py .
 COPY email_templates.py .
@@ -25,8 +25,6 @@ COPY redis_client_lib/ redis_client_lib/
 COPY services/ services/
 COPY workers/ workers/
 COPY utils/ utils/
-
-# Note: No logs directory needed - all logs go to stdout/stderr for Docker
 
 # Create non-root user
 RUN useradd -r -s /bin/false emailscheduler
