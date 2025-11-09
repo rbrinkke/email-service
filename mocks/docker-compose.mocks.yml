@@ -1,0 +1,128 @@
+# Docker Compose configuration for Mock Servers
+# Starts all mock servers for testing and development
+
+version: '3.8'
+
+services:
+  # FreeFace Platform API Mock
+  freeface-api-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    image: email-service/freeface-api-mock:latest
+    container_name: freeface-api-mock
+    ports:
+      - "8001:8000"
+    environment:
+      - MOCK_PORT=8000
+      - MOCK_LOG_LEVEL=INFO
+      - MOCK_RESPONSE_DELAY_MS=0
+    command: python freeface_api/freeface_api_mock.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - mock-network
+    restart: unless-stopped
+
+  # SendGrid Email API Mock
+  sendgrid-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    image: email-service/sendgrid-mock:latest
+    container_name: sendgrid-mock
+    ports:
+      - "8002:8000"
+    environment:
+      - MOCK_PORT=8000
+      - MOCK_LOG_LEVEL=INFO
+      - MOCK_RESPONSE_DELAY_MS=0
+    command: python email_providers/sendgrid_mock.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - mock-network
+    restart: unless-stopped
+
+  # Mailgun Email API Mock
+  mailgun-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    image: email-service/mailgun-mock:latest
+    container_name: mailgun-mock
+    ports:
+      - "8003:8000"
+    environment:
+      - MOCK_PORT=8000
+      - MOCK_LOG_LEVEL=INFO
+      - MOCK_RESPONSE_DELAY_MS=0
+    command: python email_providers/mailgun_mock.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - mock-network
+    restart: unless-stopped
+
+  # Webhook Receiver Mock
+  webhook-receiver-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    image: email-service/webhook-receiver-mock:latest
+    container_name: webhook-receiver-mock
+    ports:
+      - "8004:8000"
+    environment:
+      - MOCK_PORT=8000
+      - MOCK_LOG_LEVEL=INFO
+    command: python webhook_receiver/webhook_receiver_mock.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - mock-network
+    restart: unless-stopped
+
+networks:
+  mock-network:
+    driver: bridge
+    name: mock-network
+
+# Usage:
+#
+# Start all mocks:
+#   docker-compose -f docker-compose.mocks.yml up -d
+#
+# Start specific mock:
+#   docker-compose -f docker-compose.mocks.yml up -d freeface-api-mock
+#
+# View logs:
+#   docker-compose -f docker-compose.mocks.yml logs -f
+#
+# Stop all mocks:
+#   docker-compose -f docker-compose.mocks.yml down
+#
+# Rebuild and restart:
+#   docker-compose -f docker-compose.mocks.yml up -d --build
+#
+# Access OpenAPI docs:
+#   FreeFace API:  http://localhost:8001/docs
+#   SendGrid:      http://localhost:8002/docs
+#   Mailgun:       http://localhost:8003/docs
+#   Webhooks:      http://localhost:8004/docs

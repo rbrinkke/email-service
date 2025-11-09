@@ -1,0 +1,16 @@
+# Mock Server Dependencies
+# FastAPI and server components
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic[email]==2.5.2
+python-multipart==0.0.6
+
+# Data generation and utilities
+faker==20.1.0
+python-dotenv==1.0.0
+
+# HTTP client for testing
+httpx==0.25.2
+
+# Date/time utilities
+python-dateutil==2.8.2
