@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Email Workers (scaled for parallel processing)
   email-worker:
