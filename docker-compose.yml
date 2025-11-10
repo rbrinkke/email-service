@@ -1,65 +1,30 @@
 version: '3.8'
 
 services:
-  # Mailhog for email testing
-  mailhog:
-    image: mailhog/mailhog:latest
-    container_name: freeface-mailhog
-    ports:
-      - "1025:1025"  # SMTP port
-      - "8025:8025"  # Web UI
-    networks:
-      - email_network
-    restart: unless-stopped
-
-  # Redis for email queues and rate limiting
-  redis-email:
-    image: redis:7-alpine
-    container_name: freeface-email-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_email_data:/data
-      - ./redis.conf:/usr/local/etc/redis/redis.conf
-    command: redis-server /usr/local/etc/redis/redis.conf
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - email_network
-
-  # Email Workers
-  # Note: Scale workers with: docker-compose up -d --scale email-worker=3
+  # Email Workers (scaled for parallel processing)
   email-worker:
     build:
       context: .
       dockerfile: Dockerfile.worker
+    env_file:
+      - .env
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      - WORKER_ID=worker-${HOSTNAME}
-      # Logging configuration
+      - WORKER_ID=worker-${HOSTNAME:-unknown}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - LOG_FORMAT=${LOG_FORMAT:-json}  # JSON for structured logging
+      - LOG_FORMAT=${LOG_FORMAT:-json}
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
-    depends_on:
-      redis-email:
-        condition: service_healthy
+      - SMTP_HOST=mailhog        # Use centralized MailHog
+      - SMTP_PORT=1025
     restart: unless-stopped
     networks:
-      - email_network
-      - activity-observability  # Connect to observability stack
+      - activity-network
     labels:
-      # Loki log collection (workers don't expose metrics endpoint)
       - "loki.collect=true"
-      # Service metadata
       - "service.name=email-worker"
       - "service.type=worker"
       - "service.team=platform"
@@ -77,42 +42,37 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    container_name: freeface-email-api
+    container_name: email-api          # Changed from freeface-email-api
     ports:
-      - "8010:8010"
+      - "9000:8010"                    # Map to port 9000 on host
+    env_file:
+      - .env
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      # Logging configuration
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - LOG_FORMAT=${LOG_FORMAT:-json}  # JSON for structured logging
+      - LOG_FORMAT=${LOG_FORMAT:-json}
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
-      # Observability
+      - SMTP_HOST=mailhog              # Use centralized MailHog
+      - SMTP_PORT=1025
       - ENABLE_METRICS=true
-    depends_on:
-      redis-email:
-        condition: service_healthy
     restart: unless-stopped
     networks:
-      - email_network
-      - activity-observability  # Connect to observability stack
+      - activity-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
     labels:
-      # Prometheus metrics scraping
       - "prometheus.scrape=true"
       - "prometheus.port=8010"
       - "prometheus.path=/metrics"
-      # Loki log collection
       - "loki.collect=true"
-      # Service metadata
       - "service.name=email-api"
       - "service.type=api"
       - "service.team=platform"
@@ -128,58 +88,65 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.monitor
-    container_name: freeface-email-monitor
+    container_name: email-monitor
     ports:
       - "8011:8011"
+    env_file:
+      - .env
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      # Logging configuration
       - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
       - LOG_FORMAT=${LOG_FORMAT:-text}
       - ENVIRONMENT=${ENVIRONMENT:-development}
-    depends_on:
-      redis-email:
-        condition: service_healthy
     restart: unless-stopped
     networks:
-      - email_network
+      - activity-network
 
   # Scheduler Service
   email-scheduler:
     build:
       context: .
       dockerfile: Dockerfile.scheduler
-    container_name: freeface-email-scheduler
+    container_name: email-scheduler
+    env_file:
+      - .env
     environment:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
-      # Logging configuration
       - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
       - LOG_FORMAT=${LOG_FORMAT:-text}
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
-    depends_on:
-      redis-email:
-        condition: service_healthy
+      - SMTP_HOST=mailhog              # Use centralized MailHog
+      - SMTP_PORT=1025
     restart: unless-stopped
     networks:
-      - email_network
+      - activity-network
 
-volumes:
-  redis_email_data:
-    driver: local
+  # Redis for Email Service (dedicated instance)
+  redis-email:
+    image: redis:7-alpine
+    container_name: redis-email
+    restart: unless-stopped
+    networks:
+      - activity-network
+    volumes:
+      - redis-email-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    labels:
+      - "service.name=redis-email"
+      - "service.type=database"
 
 networks:
-  email_network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.22.0.0/16
-
-  # External observability network (created by observability-stack)
-  activity-observability:
+  activity-network:
     external: true
+
+volumes:
+  redis-email-data:
