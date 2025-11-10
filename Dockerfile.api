@@ -19,7 +19,9 @@ RUN pip install fastapi uvicorn pyyaml
 COPY email_system.py .
 COPY api.py .
 COPY email_templates.py .
+COPY metrics.py .
 COPY config/ config/
+COPY middleware/ middleware/
 COPY models/ models/
 COPY providers/ providers/
 COPY redis_client_lib/ redis_client_lib/

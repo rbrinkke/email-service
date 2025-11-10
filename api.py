@@ -7,6 +7,9 @@ from datetime import datetime
 from typing import Dict, List, Optional, Union
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import PlainTextResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, EmailStr
 
 from config.logging_config import setup_logging
@@ -15,6 +18,9 @@ from email_system import EmailConfig, EmailPriority, EmailProvider, EmailService
 from middleware import AccessLoggingMiddleware, ExceptionHandlerMiddleware, RequestIDMiddleware
 from services.audit_service import audit_trail
 from services.auth_service import ServiceIdentity, authenticator
+
+# Import metrics module for observability
+import metrics
 
 # Configure logging using centralized configuration
 # This sets up Docker-compatible logging (stdout/stderr only)
@@ -34,6 +40,26 @@ app = FastAPI(
     description="High-performance email delivery system with priority queues and rate limiting",
     version="1.0.0",
 )
+
+# ============================================================================
+# Prometheus Metrics Instrumentation
+# ============================================================================
+
+# Initialize Prometheus instrumentator for automatic HTTP metrics (RED pattern)
+# This provides: request_count, request_duration, response_size, etc.
+instrumentator = Instrumentator(
+    should_group_status_codes=False,  # Track exact status codes
+    should_ignore_untemplated=True,   # Ignore requests to unknown endpoints
+    should_respect_env_var=True,      # Respect ENABLE_METRICS env var
+    should_instrument_requests_inprogress=True,  # Track concurrent requests
+    excluded_handlers=["/metrics", "/health"],   # Don't track internal endpoints
+    env_var_name="ENABLE_METRICS",
+    inprogress_name="http_requests_inprogress",
+    inprogress_labels=True,
+)
+
+# Instrument the FastAPI app (automatically adds HTTP metrics)
+instrumentator.instrument(app)
 
 # Add middleware in correct order (CRITICAL: order matters!)
 # 1. Exception handler (LAST - catches everything)
@@ -138,6 +164,14 @@ async def startup_event():
     audit_trail.set_redis_client(email_service.redis_client)
     logger.info("Audit trail initialized")
 
+    # Initialize Prometheus metrics
+    environment = os.getenv("ENVIRONMENT", "development")
+    metrics.initialize_metrics(service_version="1.0.0", environment=environment)
+
+    # Set initial Redis connection status
+    metrics.redis_connected.set(1)
+
+    logger.info("Prometheus metrics initialized (environment=%s)", environment)
     logger.info("Email API service started")
 
 
@@ -176,8 +210,21 @@ async def send_email(
             scheduled_at=request.scheduled_at,
         )
 
-        # Log to audit trail
+        # Track metrics
         recipient_count = len(request.recipients) if isinstance(request.recipients, list) else 1
+        metrics.emails_total.labels(
+            status="queued",
+            priority=request.priority.value,
+            provider=request.provider.value
+        ).inc(recipient_count)
+
+        metrics.queue_operations_total.labels(
+            operation="enqueue",
+            queue=request.priority.value,
+            status="success"
+        ).inc()
+
+        # Log to audit trail
         await audit_trail.log_service_call(
             service_name=service.name,
             endpoint="/send",
@@ -397,6 +444,55 @@ async def liveness_check():
     Use /health for readiness checks that verify Redis connectivity.
     """
     return {"status": "alive"}
+
+
+@app.get("/metrics")
+async def metrics_endpoint():
+    """
+    Prometheus metrics endpoint
+
+    **Authentication:** NO authentication required (public endpoint for Prometheus scraping)
+
+    Exposes Prometheus metrics in text format for scraping by Prometheus server.
+    This endpoint should be publicly accessible within your monitoring network.
+
+    Metrics include:
+    - HTTP request metrics (rate, errors, duration)
+    - Email delivery metrics (sent, failed, duration by provider)
+    - Queue depth metrics (per priority level)
+    - Redis connection health
+    - Worker status and throughput
+
+    **Prometheus Configuration:**
+    ```yaml
+    scrape_configs:
+      - job_name: 'email-service'
+        static_configs:
+          - targets: ['email-api:8010']
+    ```
+
+    Or use Docker service discovery with label: `prometheus.scrape=true`
+    """
+    # Update queue depth metrics before exposing
+    try:
+        stats = await email_service.get_stats()
+        metrics.queue_depth.labels(priority="high", queue_type="pending").set(
+            stats.get("queue_high", 0)
+        )
+        metrics.queue_depth.labels(priority="medium", queue_type="pending").set(
+            stats.get("queue_medium", 0)
+        )
+        metrics.queue_depth.labels(priority="low", queue_type="pending").set(
+            stats.get("queue_low", 0)
+        )
+    except Exception as e:
+        logger.warning("Failed to update queue metrics: %s", e)
+
+    # Generate and return Prometheus metrics
+    return PlainTextResponse(
+        content=generate_latest().decode("utf-8"),
+        media_type=CONTENT_TYPE_LATEST
+    )
 
 
 @app.get("/health")

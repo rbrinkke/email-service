@@ -42,8 +42,8 @@ services:
       - REDIS_PORT=6379
       - WORKER_ID=worker-${HOSTNAME}
       # Logging configuration
-      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
-      - LOG_FORMAT=${LOG_FORMAT:-text}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}  # JSON for structured logging
       - ENVIRONMENT=${ENVIRONMENT:-development}
       # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
@@ -55,6 +55,20 @@ services:
     restart: unless-stopped
     networks:
       - email_network
+      - activity-observability  # Connect to observability stack
+    labels:
+      # Loki log collection (workers don't expose metrics endpoint)
+      - "loki.collect=true"
+      # Service metadata
+      - "service.name=email-worker"
+      - "service.type=worker"
+      - "service.team=platform"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service.name,service.type"
     deploy:
       replicas: 3
 
@@ -70,24 +84,44 @@ services:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
       # Logging configuration
-      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
-      - LOG_FORMAT=${LOG_FORMAT:-text}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}  # JSON for structured logging
       - ENVIRONMENT=${ENVIRONMENT:-development}
       # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
+      # Observability
+      - ENABLE_METRICS=true
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - email_network
+      - activity-observability  # Connect to observability stack
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    labels:
+      # Prometheus metrics scraping
+      - "prometheus.scrape=true"
+      - "prometheus.port=8010"
+      - "prometheus.path=/metrics"
+      # Loki log collection
+      - "loki.collect=true"
+      # Service metadata
+      - "service.name=email-api"
+      - "service.type=api"
+      - "service.team=platform"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service.name,service.type"
 
   # Monitoring Dashboard
   email-monitor:
@@ -144,4 +178,8 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.20.0.0/16
+        - subnet: 172.22.0.0/16
+
+  # External observability network (created by observability-stack)
+  activity-observability:
+    external: true
