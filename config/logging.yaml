@@ -71,8 +71,9 @@ loggers:
     propagate: no  # CRITICAL: Prevents duplicate logs
 
   uvicorn.access:
-    # HTTP access logs (we disable this in favor of custom middleware)
-    level: WARNING  # Effectively disabled
+    # HTTP access logs (DISABLED - we use custom AccessLoggingMiddleware instead)
+    # Custom middleware provides structured JSON logs with request_id correlation
+    level: CRITICAL  # Effectively disabled (only CRITICAL+ will show, which never happens)
     handlers: []
     propagate: no
 
@@ -90,6 +91,19 @@ loggers:
     # FastAPI application logic
     level: DEBUG
     handlers: [stdout, stderr]
+    propagate: no
+
+  api.access:
+    # Custom access logs from AccessLoggingMiddleware
+    # This replaces uvicorn.access (which is disabled)
+    level: INFO
+    handlers: [stdout, stderr]
+    propagate: no
+
+  api.exceptions:
+    # Exception handler middleware logs
+    level: ERROR
+    handlers: [stderr]
     propagate: no
 
   worker:
