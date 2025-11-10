@@ -577,19 +577,22 @@ python scripts/generate_service_token.py --validate st_dev_abc123...
 
 ### Protected Endpoints
 
+All protected endpoints require a valid service token via the `X-Service-Token` header.
+
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/send` | POST | Send email |
-| `/send/welcome` | POST | Send welcome email |
-| `/send/password-reset` | POST | Send password reset |
-| `/send/group-notification` | POST | Send group notification |
-| `/stats` | GET | Get statistics |
+| `/send` | POST | Send email with any template (universal endpoint) |
+| `/stats` | GET | Get email system statistics |
+
+**Note:** The `/send` endpoint is the universal email sending endpoint. Specify the template name in the request body to use any available template.
 
 ### Public Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check (no auth) |
+| `/live` | GET | Liveness check (no auth) |
+| `/metrics` | GET | Prometheus metrics (no auth) |
 
 ### Request Header
 

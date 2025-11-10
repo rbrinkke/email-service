@@ -119,96 +119,6 @@ class EmailClient:
         result = response.json()
         return result["job_id"]
 
-    async def send_welcome_email(
-        self,
-        user_email: str,
-        user_name: str,
-        verification_token: str
-    ) -> str:
-        """
-        Send welcome email (convenience method)
-
-        Args:
-            user_email: User's email address
-            user_name: User's name
-            verification_token: Email verification token
-
-        Returns:
-            Job ID (str)
-        """
-        response = await self.client.post(
-            "/send/welcome",
-            params={
-                "user_email": user_email,
-                "user_name": user_name,
-                "verification_token": verification_token
-            }
-        )
-
-        response.raise_for_status()
-        result = response.json()
-        return result["job_id"]
-
-    async def send_password_reset(
-        self,
-        user_email: str,
-        reset_token: str
-    ) -> str:
-        """
-        Send password reset email
-
-        Args:
-            user_email: User's email address
-            reset_token: Password reset token
-
-        Returns:
-            Job ID (str)
-        """
-        response = await self.client.post(
-            "/send/password-reset",
-            params={
-                "user_email": user_email,
-                "reset_token": reset_token
-            }
-        )
-
-        response.raise_for_status()
-        result = response.json()
-        return result["job_id"]
-
-    async def send_group_notification(
-        self,
-        group_id: str,
-        template: str,
-        data: dict,
-        priority: str = "medium"
-    ) -> str:
-        """
-        Send notification to group members
-
-        Args:
-            group_id: Group identifier
-            template: Template name
-            data: Template variables
-            priority: "high", "medium", or "low"
-
-        Returns:
-            Job ID (str)
-        """
-        response = await self.client.post(
-            "/send/group-notification",
-            params={
-                "group_id": group_id,
-                "template": template,
-                "priority": priority
-            },
-            json=data
-        )
-
-        response.raise_for_status()
-        result = response.json()
-        return result["job_id"]
-
     async def get_stats(self) -> dict:
         """
         Get email system statistics
@@ -225,14 +135,29 @@ class EmailClient:
 async def main():
     async with EmailClient() as email:
         # Send welcome email
-        job_id = await email.send_welcome_email(
-            user_email="newuser@example.com",
-            user_name="John Doe",
-            verification_token="abc123"
+        job_id = await email.send_email(
+            recipients="newuser@example.com",
+            template="welcome",
+            data={
+                "name": "John Doe",
+                "verification_link": "https://freeface.com/verify/abc123"
+            },
+            priority="high"
         )
         print(f"Welcome email queued: {job_id}")
 
-        # Send custom email
+        # Send password reset email
+        job_id = await email.send_email(
+            recipients="user@example.com",
+            template="password_reset",
+            data={
+                "reset_link": "https://freeface.com/reset/xyz789"
+            },
+            priority="high"
+        )
+        print(f"Password reset email queued: {job_id}")
+
+        # Send custom newsletter
         job_id = await email.send_email(
             recipients=["user1@example.com", "user2@example.com"],
             template="monthly_newsletter",
@@ -368,50 +293,6 @@ class EmailClient {
     }
 
     /**
-     * Send welcome email
-     */
-    async sendWelcomeEmail(userEmail, userName, verificationToken) {
-        const response = await this.client.post('/send/welcome', null, {
-            params: {
-                user_email: userEmail,
-                user_name: userName,
-                verification_token: verificationToken
-            }
-        });
-
-        return response.data.job_id;
-    }
-
-    /**
-     * Send password reset email
-     */
-    async sendPasswordReset(userEmail, resetToken) {
-        const response = await this.client.post('/send/password-reset', null, {
-            params: {
-                user_email: userEmail,
-                reset_token: resetToken
-            }
-        });
-
-        return response.data.job_id;
-    }
-
-    /**
-     * Send group notification
-     */
-    async sendGroupNotification(groupId, template, data, priority = 'medium') {
-        const response = await this.client.post('/send/group-notification', data, {
-            params: {
-                group_id: groupId,
-                template,
-                priority
-            }
-        });
-
-        return response.data.job_id;
-    }
-
-    /**
      * Get email statistics
      */
     async getStats() {
@@ -426,14 +307,29 @@ async function main() {
 
     try {
         // Send welcome email
-        const jobId = await email.sendWelcomeEmail(
+        const jobId = await email.sendEmail(
             'newuser@example.com',
-            'John Doe',
-            'abc123'
+            'welcome',
+            {
+                name: 'John Doe',
+                verification_link: 'https://freeface.com/verify/abc123'
+            },
+            'high'
         );
         console.log(`Welcome email queued: ${jobId}`);
 
-        // Send custom email
+        // Send password reset email
+        const resetJobId = await email.sendEmail(
+            'user@example.com',
+            'password_reset',
+            {
+                reset_link: 'https://freeface.com/reset/xyz789'
+            },
+            'high'
+        );
+        console.log(`Password reset email queued: ${resetJobId}`);
+
+        // Send custom newsletter
         const customJobId = await email.sendEmail(
             ['user1@example.com', 'user2@example.com'],
             'monthly_newsletter',
@@ -461,7 +357,7 @@ main();
 
 ## cURL Examples
 
-### Send Email
+### Send Welcome Email
 
 ```bash
 #!/bin/bash
@@ -470,7 +366,7 @@ main();
 EMAIL_SERVICE_URL="http://email-api:8010"
 SERVICE_TOKEN="st_dev_abc123..."
 
-# Send email
+# Send welcome email
 curl -X POST "${EMAIL_SERVICE_URL}/send" \
   -H "X-Service-Token: ${SERVICE_TOKEN}" \
   -H "Content-Type: application/json" \
@@ -486,18 +382,41 @@ curl -X POST "${EMAIL_SERVICE_URL}/send" \
   }'
 ```
 
-### Send Welcome Email
+### Send Password Reset Email
 
 ```bash
-curl -X POST "${EMAIL_SERVICE_URL}/send/welcome?user_email=user@example.com&user_name=John%20Doe&verification_token=abc123" \
-  -H "X-Service-Token: ${SERVICE_TOKEN}"
+# Send password reset email
+curl -X POST "${EMAIL_SERVICE_URL}/send" \
+  -H "X-Service-Token: ${SERVICE_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipients": "user@example.com",
+    "template": "password_reset",
+    "data": {
+      "reset_link": "https://freeface.com/reset/xyz789"
+    },
+    "priority": "high",
+    "provider": "smtp"
+  }'
 ```
 
-### Send Password Reset
+### Send Custom Newsletter
 
 ```bash
-curl -X POST "${EMAIL_SERVICE_URL}/send/password-reset?user_email=user@example.com&reset_token=xyz789" \
-  -H "X-Service-Token: ${SERVICE_TOKEN}"
+# Send custom newsletter to multiple recipients
+curl -X POST "${EMAIL_SERVICE_URL}/send" \
+  -H "X-Service-Token: ${SERVICE_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipients": ["user1@example.com", "user2@example.com"],
+    "template": "monthly_newsletter",
+    "data": {
+      "month": "November",
+      "highlights": ["Feature 1", "Feature 2"]
+    },
+    "priority": "low",
+    "provider": "smtp"
+  }'
 ```
 
 ### Get Statistics
