@@ -312,8 +312,8 @@ test_email_sending() {
     curl -s -X DELETE "$MAILHOG_API_URL/api/v1/messages" > /dev/null 2>&1 || true
     sleep 1
 
-    # Test: POST /send
-    print_test "POST /send (basic email)"
+    # Test: POST /send (basic welcome email)
+    print_test "POST /send (welcome template)"
     response=$(curl -s -w "\n%{http_code}" -X POST "$EMAIL_API_URL/send" \
         -H "Content-Type: application/json" \
         -H "X-Service-Token: $SERVICE_TOKEN" \
@@ -331,14 +331,23 @@ test_email_sending() {
         print_pass
         echo -e "    ${CYAN}Job ID: $JOB_ID_BASIC${NC}"
     else
-        print_fail "POST /send" "Expected 200, got $http_code: $body"
+        print_fail "POST /send (welcome)" "Expected 200, got $http_code: $body"
     fi
 
-    # Test: POST /send/welcome
-    print_test "POST /send/welcome"
-    response=$(curl -s -w "\n%{http_code}" -X POST \
-        "$EMAIL_API_URL/send/welcome?user_email=welcome-test@example.com&user_name=Welcome%20User&verification_token=abc123xyz" \
-        -H "X-Service-Token: $SERVICE_TOKEN")
+    # Test: POST /send (user_welcome template)
+    print_test "POST /send (user_welcome template)"
+    response=$(curl -s -w "\n%{http_code}" -X POST "$EMAIL_API_URL/send" \
+        -H "Content-Type: application/json" \
+        -H "X-Service-Token: $SERVICE_TOKEN" \
+        -d '{
+            "recipients": "welcome-test@example.com",
+            "template": "user_welcome",
+            "data": {
+                "name": "Welcome User",
+                "verification_link": "https://freeface.com/verify/abc123xyz"
+            },
+            "priority": "high"
+        }')
     http_code=$(echo "$response" | tail -n 1)
     body=$(echo "$response" | head -n -1)
 
@@ -347,14 +356,22 @@ test_email_sending() {
         print_pass
         echo -e "    ${CYAN}Job ID: $JOB_ID_WELCOME${NC}"
     else
-        print_fail "POST /send/welcome" "Expected 200, got $http_code: $body"
+        print_fail "POST /send (user_welcome)" "Expected 200, got $http_code: $body"
     fi
 
-    # Test: POST /send/password-reset
-    print_test "POST /send/password-reset"
-    response=$(curl -s -w "\n%{http_code}" -X POST \
-        "$EMAIL_API_URL/send/password-reset?user_email=reset-test@example.com&reset_token=reset123xyz" \
-        -H "X-Service-Token: $SERVICE_TOKEN")
+    # Test: POST /send (password_reset template)
+    print_test "POST /send (password_reset template)"
+    response=$(curl -s -w "\n%{http_code}" -X POST "$EMAIL_API_URL/send" \
+        -H "Content-Type: application/json" \
+        -H "X-Service-Token: $SERVICE_TOKEN" \
+        -d '{
+            "recipients": "reset-test@example.com",
+            "template": "password_reset",
+            "data": {
+                "reset_link": "https://freeface.com/reset/reset123xyz"
+            },
+            "priority": "high"
+        }')
     http_code=$(echo "$response" | tail -n 1)
     body=$(echo "$response" | head -n -1)
 
@@ -363,7 +380,48 @@ test_email_sending() {
         print_pass
         echo -e "    ${CYAN}Job ID: $JOB_ID_RESET${NC}"
     else
-        print_fail "POST /send/password-reset" "Expected 200, got $http_code: $body"
+        print_fail "POST /send (password_reset)" "Expected 200, got $http_code: $body"
+    fi
+
+    # Test: OLD ENDPOINTS REMOVED - Should return 404
+    print_test "POST /send/welcome returns 404 (removed endpoint)"
+    response=$(curl -s -w "\n%{http_code}" -X POST \
+        "$EMAIL_API_URL/send/welcome?user_email=test@example.com&user_name=Test&verification_token=abc" \
+        -H "X-Service-Token: $SERVICE_TOKEN")
+    http_code=$(echo "$response" | tail -n 1)
+
+    if [ "$http_code" = "404" ]; then
+        print_pass
+    else
+        print_fail "POST /send/welcome (404 check)" "Expected 404, got $http_code"
+    fi
+
+    # Test: OLD password-reset endpoint - Should return 404
+    print_test "POST /send/password-reset returns 404 (removed endpoint)"
+    response=$(curl -s -w "\n%{http_code}" -X POST \
+        "$EMAIL_API_URL/send/password-reset?user_email=test@example.com&reset_token=xyz" \
+        -H "X-Service-Token: $SERVICE_TOKEN")
+    http_code=$(echo "$response" | tail -n 1)
+
+    if [ "$http_code" = "404" ]; then
+        print_pass
+    else
+        print_fail "POST /send/password-reset (404 check)" "Expected 404, got $http_code"
+    fi
+
+    # Test: OLD group-notification endpoint - Should return 404
+    print_test "POST /send/group-notification returns 404 (removed endpoint)"
+    response=$(curl -s -w "\n%{http_code}" -X POST \
+        "$EMAIL_API_URL/send/group-notification?group_id=test&template=test&priority=medium" \
+        -H "Content-Type: application/json" \
+        -H "X-Service-Token: $SERVICE_TOKEN" \
+        -d '{}')
+    http_code=$(echo "$response" | tail -n 1)
+
+    if [ "$http_code" = "404" ]; then
+        print_pass
+    else
+        print_fail "POST /send/group-notification (404 check)" "Expected 404, got $http_code"
     fi
 
     # Test: POST /send - Multiple recipients
@@ -411,8 +469,8 @@ test_email_delivery() {
     messages=$(curl -s "$MAILHOG_API_URL/api/v2/messages")
     message_count=$(echo "$messages" | jq -r '.total // 0')
 
-    # We sent 4 emails (basic, welcome, reset, multi=3) = 6 total
-    # But multi might be 1 job with 3 recipients
+    # We sent: welcome, user_welcome, password_reset, multi (3 recipients) = 6 total emails
+    # But multi might be 1 job with 3 recipients depending on implementation
     if [ "$message_count" -ge 4 ]; then
         print_pass
         echo -e "    ${CYAN}Received $message_count email(s) in MailHog${NC}"
