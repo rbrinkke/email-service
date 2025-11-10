@@ -12,7 +12,15 @@ from pydantic import BaseModel, EmailStr
 from config.logging_config import setup_logging
 from config.structured_logging import setup_structured_logging, get_logger as get_struct_logger
 from email_system import EmailConfig, EmailPriority, EmailProvider, EmailService
-from middleware import AccessLoggingMiddleware, ExceptionHandlerMiddleware, RequestIDMiddleware
+from middleware import (
+    AccessLoggingMiddleware,
+    ExceptionHandlerMiddleware,
+    RequestIDMiddleware,
+    PrometheusMetricsMiddleware,
+    record_email_queued,
+    get_metrics,
+    get_metrics_content_type,
+)
 from services.audit_service import audit_trail
 from services.auth_service import ServiceIdentity, authenticator
 
@@ -38,7 +46,8 @@ app = FastAPI(
 # Add middleware in correct order (CRITICAL: order matters!)
 # 1. Exception handler (LAST - catches everything)
 # 2. Access logging (logs all requests)
-# 3. Request ID (FIRST - generates ID for correlation)
+# 3. Prometheus metrics (collects metrics for all requests)
+# 4. Request ID / Trace ID (FIRST - generates ID for correlation)
 
 # Determine if we're in development mode
 is_development = os.getenv("ENVIRONMENT", "development") == "development"
@@ -52,10 +61,11 @@ app.add_middleware(
     log_body=is_development,  # Only log bodies in development!
     max_body_length=1000
 )
+app.add_middleware(PrometheusMetricsMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 logger.info(
-    "Middleware configured: RequestID, AccessLogging, ExceptionHandler (development_mode=%s)",
+    "Middleware configured: RequestID/TraceID, Prometheus, AccessLogging, ExceptionHandler (development_mode=%s)",
     is_development
 )
 
@@ -176,6 +186,9 @@ async def send_email(
             scheduled_at=request.scheduled_at,
         )
 
+        # Record Prometheus metric
+        record_email_queued(template=request.template, priority=request.priority.value)
+
         # Log to audit trail
         recipient_count = len(request.recipients) if isinstance(request.recipients, list) else 1
         await audit_trail.log_service_call(
@@ -248,6 +261,9 @@ async def send_welcome_email(
         priority=EmailPriority.HIGH,
     )
 
+    # Record Prometheus metric
+    record_email_queued(template="user_welcome", priority="high")
+
     # Log to audit trail
     await audit_trail.log_service_call(
         service_name=service.name,
@@ -277,6 +293,9 @@ async def send_password_reset(
         data={"reset_link": f"https://freeface.com/reset/{reset_token}"},
         priority=EmailPriority.HIGH,
     )
+
+    # Record Prometheus metric
+    record_email_queued(template="password_reset", priority="high")
 
     # Log to audit trail
     await audit_trail.log_service_call(
@@ -308,6 +327,9 @@ async def send_group_notification(
     job_id = await email_service.send_email(
         recipients=f"group:{group_id}", template=template, data=data, priority=priority
     )
+
+    # Record Prometheus metric
+    record_email_queued(template=template, priority=priority.value)
 
     # Log to audit trail
     await audit_trail.log_service_call(
@@ -385,6 +407,27 @@ async def get_stats(service: ServiceIdentity = Depends(verify_service_token)):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.get("/metrics")
+async def metrics():
+    """
+    Prometheus metrics endpoint
+
+    **Authentication:** NO authentication required (public endpoint for Prometheus scraping)
+
+    Returns metrics in Prometheus exposition format for the observability stack.
+    This endpoint is automatically discovered and scraped by Prometheus.
+
+    Metrics include:
+    - http_requests_total: Total HTTP requests by endpoint, method, status
+    - http_request_duration_seconds: Request latency histogram
+    - http_requests_active: Currently active requests
+    - email_jobs_queued_total: Email jobs queued by template and priority
+    - email_service_info: Service metadata
+    """
+    from fastapi.responses import Response
+    return Response(content=get_metrics(), media_type=get_metrics_content_type())
+
+
 @app.get("/live")
 async def liveness_check():
     """
@@ -411,15 +454,21 @@ async def health_check():
     - Load balancer health monitoring
     - Service discovery systems
     - Kubernetes readiness probes
+    - Activity App observability stack
 
     Checks Redis connectivity and queue status.
+    Returns structured response with timestamp and service name for observability.
     """
     try:
         # Test Redis connection
         stats = await email_service.get_stats()
         return {
             "status": "healthy",
-            "redis": "connected",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "service": "email-api",
+            "dependencies": {
+                "redis": "connected"
+            },
             "queues": {
                 "high": stats.get("queue_high", 0),
                 "medium": stats.get("queue_medium", 0),
