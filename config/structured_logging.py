@@ -67,11 +67,14 @@ def setup_structured_logging(enable_json: bool = None):
     # Configure structlog processors
     # These run in order and transform/enrich log records
     processors = [
+        # CRITICAL: Merge context vars (trace_id, user_id, etc.) into log records
+        # This makes trace_id automatically appear in every log message
+        structlog.contextvars.merge_contextvars,
         # Add log level to event dict
         structlog.stdlib.add_log_level,
-        # Add logger name to event dict
+        # Add logger name to event dict (service name)
         structlog.stdlib.add_logger_name,
-        # Add timestamp in ISO format
+        # Add timestamp in ISO format with timezone (observability stack requirement)
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         # Add stack info for exceptions
         structlog.processors.StackInfoRenderer(),

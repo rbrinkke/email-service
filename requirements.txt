@@ -10,3 +10,4 @@ uvicorn[standard]==0.24.0
 fastapi==0.104.1
 structlog==24.1.0  # Structured logging (JSON) for production observability
 pyyaml==6.0.1  # Required for logging.yaml configuration
+prometheus-client==0.19.0  # Prometheus metrics for observability stack integration

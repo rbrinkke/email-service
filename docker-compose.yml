@@ -42,19 +42,28 @@ services:
       - REDIS_PORT=6379
       - WORKER_ID=worker-${HOSTNAME}
       # Logging configuration
-      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
-      - LOG_FORMAT=${LOG_FORMAT:-text}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
+    labels:
+      # Loki log collection for workers
+      loki.collect: "true"
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - email_network
+      - activity-observability
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       replicas: 3
 
@@ -70,24 +79,38 @@ services:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
       # Logging configuration
-      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
-      - LOG_FORMAT=${LOG_FORMAT:-text}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
+    labels:
+      # Prometheus auto-discovery labels
+      prometheus.scrape: "true"
+      prometheus.port: "8010"
+      prometheus.path: "/metrics"
+      # Loki log collection
+      loki.collect: "true"
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - email_network
+      - activity-observability
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
 
   # Monitoring Dashboard
   email-monitor:
@@ -101,15 +124,28 @@ services:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
       # Logging configuration
-      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
-      - LOG_FORMAT=${LOG_FORMAT:-text}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    labels:
+      # Prometheus auto-discovery labels
+      prometheus.scrape: "true"
+      prometheus.port: "8011"
+      prometheus.path: "/metrics"
+      # Loki log collection
+      loki.collect: "true"
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - email_network
+      - activity-observability
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Scheduler Service
   email-scheduler:
@@ -121,19 +157,28 @@ services:
       - REDIS_HOST=redis-email
       - REDIS_PORT=6379
       # Logging configuration
-      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
-      - LOG_FORMAT=${LOG_FORMAT:-text}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       # Provider credentials
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
+    labels:
+      # Loki log collection for scheduler
+      loki.collect: "true"
     depends_on:
       redis-email:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - email_network
+      - activity-observability
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   redis_email_data:
@@ -145,3 +190,8 @@ networks:
     ipam:
       config:
         - subnet: 172.20.0.0/16
+
+  # External observability network for Prometheus/Loki/Grafana integration
+  activity-observability:
+    external: true
+    name: activity-observability
