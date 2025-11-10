@@ -117,7 +117,7 @@ class ServiceAuditTrail:
         key = f"service:audit:{job_id}"
 
         # Store as Redis hash
-        await self.redis_client.client.hset(
+        await self.redis_client.hset(
             key,
             mapping={
                 k: json.dumps(v) if isinstance(v, (dict, list)) else str(v)
@@ -126,7 +126,7 @@ class ServiceAuditTrail:
         )
 
         # Set TTL: keep audit records for 30 days
-        await self.redis_client.client.expire(key, 30 * 24 * 60 * 60)
+        await self.redis_client.expire(key, 30 * 24 * 60 * 60)
 
     async def _log_service_call_timeline(
         self, service_name: str, today: str, timestamp: datetime, endpoint: str
@@ -146,10 +146,10 @@ class ServiceAuditTrail:
         score = timestamp.timestamp()
         value = f"{timestamp.isoformat()}|{endpoint}"
 
-        await self.redis_client.client.zadd(key, {value: score})
+        await self.redis_client.zadd(key, {value: score})
 
         # Set TTL: keep daily call logs for 90 days
-        await self.redis_client.client.expire(key, 90 * 24 * 60 * 60)
+        await self.redis_client.expire(key, 90 * 24 * 60 * 60)
 
     async def _increment_metrics(self, service_name: str, endpoint: str, metadata: Optional[Dict]):
         """
@@ -161,15 +161,15 @@ class ServiceAuditTrail:
             metadata: Call metadata
         """
         # Total calls for this service
-        await self.redis_client.client.incr(f"service:metrics:{service_name}:total_calls")
+        await self.redis_client.incr(f"service:metrics:{service_name}:total_calls")
 
         # Calls per endpoint
-        await self.redis_client.client.incr(f"service:metrics:{service_name}:{endpoint}")
+        await self.redis_client.incr(f"service:metrics:{service_name}:{endpoint}")
 
         # If this was an email send, increment email counter
         if metadata and metadata.get("recipient_count"):
             recipient_count = metadata["recipient_count"]
-            await self.redis_client.client.incrby(
+            await self.redis_client.incrby(
                 f"service:metrics:{service_name}:total_emails", recipient_count
             )
 
@@ -196,7 +196,7 @@ class ServiceAuditTrail:
 
         try:
             key = f"service:audit:{job_id}"
-            record = await self.redis_client.client.hgetall(key)
+            record = await self.redis_client.hgetall(key)
 
             if not record:
                 return None
@@ -244,16 +244,16 @@ class ServiceAuditTrail:
             today = date.today().isoformat()
 
             # Get total counters
-            total_calls = await self.redis_client.client.get(
+            total_calls = await self.redis_client.get(
                 f"service:metrics:{service_name}:total_calls"
             )
-            total_emails = await self.redis_client.client.get(
+            total_emails = await self.redis_client.get(
                 f"service:metrics:{service_name}:total_emails"
             )
 
             # Get today's calls
             calls_today_key = f"service:calls:{service_name}:{today}"
-            calls_today = await self.redis_client.client.zcard(calls_today_key)
+            calls_today = await self.redis_client.zcard(calls_today_key)
 
             # Get per-endpoint metrics
             pattern = f"service:metrics:{service_name}:/*"
@@ -262,7 +262,7 @@ class ServiceAuditTrail:
             # Scan for endpoint metric keys
             cursor = 0
             while True:
-                cursor, keys = await self.redis_client.client.scan(cursor, match=pattern, count=100)
+                cursor, keys = await self.redis_client.scan(cursor, match=pattern, count=100)
                 endpoint_keys.extend(keys)
                 if cursor == 0:
                     break
@@ -278,7 +278,7 @@ class ServiceAuditTrail:
                 if endpoint in ("total_calls", "total_emails"):
                     continue
 
-                count = await self.redis_client.client.get(key)
+                count = await self.redis_client.get(key)
                 endpoints[endpoint] = int(count) if count else 0
 
             return {
@@ -315,7 +315,7 @@ class ServiceAuditTrail:
 
             cursor = 0
             while True:
-                cursor, keys = await self.redis_client.client.scan(cursor, match=pattern, count=100)
+                cursor, keys = await self.redis_client.scan(cursor, match=pattern, count=100)
 
                 for key in keys:
                     # Extract service name

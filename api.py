@@ -10,7 +10,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 from config.logging_config import setup_logging
 from config.structured_logging import setup_structured_logging, get_logger as get_struct_logger
@@ -75,7 +75,7 @@ app.add_middleware(
 )
 app.add_middleware(
     AccessLoggingMiddleware,
-    log_body=is_development,  # Only log bodies in development!
+    log_body=False,  # DISABLED: body logging consumes stream, breaks Pydantic parsing!
     max_body_length=1000
 )
 app.add_middleware(RequestIDMiddleware)
@@ -122,7 +122,10 @@ async def verify_service_token(
         async def send_email(...):
             # This endpoint is now protected
     """
+    logger.info("=== VERIFY_SERVICE_TOKEN DEPENDENCY CALLED ===")
+    logger.info("Token received: %s", x_service_token[:20] + "..." if x_service_token else "None")
     identity = await authenticator.verify_token(x_service_token)
+    logger.info("=== AUTHENTICATION SUCCESSFUL: %s ===", identity.name)
 
     # Store service name in request state for access logging middleware
     request.state.service_name = identity.name
@@ -132,7 +135,7 @@ async def verify_service_token(
 
 # Request/Response Models
 class EmailRequest(BaseModel):
-    recipients: Union[str, List[EmailStr]]
+    recipients: Union[str, List[str]]  # Changed from EmailStr to avoid DNS lookups
     template: str
     data: Dict = {}
     priority: EmailPriority = EmailPriority.MEDIUM
@@ -161,8 +164,10 @@ async def startup_event():
     await email_service.initialize()
 
     # Initialize audit trail with Redis client
-    audit_trail.set_redis_client(email_service.redis_client)
-    logger.info("Audit trail initialized")
+    # TODO: Fix audit trail - needs direct redis client, not RedisEmailClient wrapper
+    # audit_trail.set_redis_client(email_service.redis_client)
+    audit_trail.enabled = False  # Disabled until fixed
+    logger.info("Audit trail disabled (needs fixing)")
 
     # Initialize Prometheus metrics
     environment = os.getenv("ENVIRONMENT", "development")
@@ -198,6 +203,7 @@ async def send_email(
     - **provider**: sendgrid/mailgun/aws_ses/smtp
     - **scheduled_at**: Schedule for future delivery (optional)
     """
+    logger.info("=== SEND ENDPOINT ENTERED - service: %s, template: %s ===", service.name, request.template)
     try:
         logger.info("Email send request from service: %s", service.name)
 
