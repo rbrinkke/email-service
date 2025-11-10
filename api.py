@@ -6,11 +6,13 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional, Union
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
 from config.logging_config import setup_logging
+from config.structured_logging import setup_structured_logging, get_logger as get_struct_logger
 from email_system import EmailConfig, EmailPriority, EmailProvider, EmailService
+from middleware import AccessLoggingMiddleware, ExceptionHandlerMiddleware, RequestIDMiddleware
 from services.audit_service import audit_trail
 from services.auth_service import ServiceIdentity, authenticator
 
@@ -19,13 +21,42 @@ from services.auth_service import ServiceIdentity, authenticator
 # Respects LOG_LEVEL, ENVIRONMENT, and other logging env vars
 setup_logging()
 
-# Get logger for this module
+# Setup structured logging (JSON in production, pretty console in development)
+# This is CRITICAL for production observability and debugging
+setup_structured_logging()
+
+# Get loggers - use both stdlib and structlog
 logger = logging.getLogger(__name__)
+struct_logger = get_struct_logger(__name__)
 
 app = FastAPI(
     title="FreeFace Email Service API",
     description="High-performance email delivery system with priority queues and rate limiting",
     version="1.0.0",
+)
+
+# Add middleware in correct order (CRITICAL: order matters!)
+# 1. Exception handler (LAST - catches everything)
+# 2. Access logging (logs all requests)
+# 3. Request ID (FIRST - generates ID for correlation)
+
+# Determine if we're in development mode
+is_development = os.getenv("ENVIRONMENT", "development") == "development"
+
+app.add_middleware(
+    ExceptionHandlerMiddleware,
+    include_traceback_in_response=is_development  # Only in development!
+)
+app.add_middleware(
+    AccessLoggingMiddleware,
+    log_body=is_development,  # Only log bodies in development!
+    max_body_length=1000
+)
+app.add_middleware(RequestIDMiddleware)
+
+logger.info(
+    "Middleware configured: RequestID, AccessLogging, ExceptionHandler (development_mode=%s)",
+    is_development
 )
 
 # Initialize email service
@@ -37,6 +68,7 @@ email_service = EmailService(config)
 
 # Authentication Dependency
 async def verify_service_token(
+    request: Request,
     x_service_token: Optional[str] = Header(
         None,
         description="Service authentication token (format: st_<env>_<random>)",
@@ -50,6 +82,7 @@ async def verify_service_token(
     Used as a dependency on protected endpoints.
 
     Args:
+        request: FastAPI request (for storing service name in state)
         x_service_token: Service token from X-Service-Token header
 
     Returns:
@@ -63,7 +96,12 @@ async def verify_service_token(
         async def send_email(...):
             # This endpoint is now protected
     """
-    return await authenticator.verify_token(x_service_token)
+    identity = await authenticator.verify_token(x_service_token)
+
+    # Store service name in request state for access logging middleware
+    request.state.service_name = identity.name
+
+    return identity
 
 
 # Request/Response Models
@@ -158,8 +196,32 @@ async def send_email(
         )
 
     except Exception as e:
-        logger.error("Email send error (service: %s): %s", service.name, e)
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log exception with full context
+        logger.error(
+            "Email send error (service: %s): %s",
+            service.name,
+            e,
+            exc_info=True,  # Include full traceback
+            extra={
+                "service_name": service.name,
+                "template": request.template,
+                "priority": request.priority.value,
+                "error_type": type(e).__name__,
+            }
+        )
+
+        # Also log with structlog for structured output
+        struct_logger.error(
+            "email_send_failed",
+            service_name=service.name,
+            template=request.template,
+            priority=request.priority.value,
+            error_type=type(e).__name__,
+            error=str(e),
+            exc_info=True
+        )
+
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/send/welcome")
@@ -299,8 +361,28 @@ async def get_stats(service: ServiceIdentity = Depends(verify_service_token)):
         )
 
     except Exception as e:
-        logger.error("Stats error (service: %s): %s", service.name, e)
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log exception with full context
+        logger.error(
+            "Stats retrieval error (service: %s): %s",
+            service.name,
+            e,
+            exc_info=True,  # Include full traceback
+            extra={
+                "service_name": service.name,
+                "error_type": type(e).__name__,
+            }
+        )
+
+        # Also log with structlog
+        struct_logger.error(
+            "stats_retrieval_failed",
+            service_name=service.name,
+            error_type=type(e).__name__,
+            error=str(e),
+            exc_info=True
+        )
+
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/live")
@@ -345,4 +427,19 @@ async def health_check():
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Service unhealthy: {e}")
+        # Log health check failure
+        logger.error(
+            "Health check failed: %s",
+            e,
+            exc_info=True,
+            extra={"error_type": type(e).__name__}
+        )
+
+        struct_logger.error(
+            "health_check_failed",
+            error_type=type(e).__name__,
+            error=str(e),
+            exc_info=True
+        )
+
+        raise HTTPException(status_code=503, detail=f"Service unhealthy: {e}") from e
