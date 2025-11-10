@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Your Verification Code</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: #4CAF50;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 40px 30px;
+            background: white;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        .code-container {
+            background: #f9f9f9;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        .code-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .code {
+            font-size: 48px;
+            font-weight: bold;
+            color: #4CAF50;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        .expiry {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .warning-box p {
+            margin: 0;
+            color: #856404;
+        }
+        .info-text {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+            background: #f9f9f9;
+            border-radius: 0 0 8px 8px;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .purpose-badge {
+            display: inline-block;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Verification Code</h1>
+        </div>
+        <div class="content">
+            {% if purpose %}
+            <div class="purpose-badge">{{ purpose }}</div>
+            {% endif %}
+
+            <p class="greeting">Hello{% if name %} {{ name }}{% endif %},</p>
+
+            <p>You requested a verification code. Please use the code below to complete your action:</p>
+
+            <div class="code-container">
+                <div class="code-label">Your Code</div>
+                <div class="code">{{ code }}</div>
+                {% if expiry_minutes %}
+                <div class="expiry">⏱️ Expires in {{ expiry_minutes }} minutes</div>
+                {% else %}
+                <div class="expiry">⏱️ Expires in 10 minutes</div>
+                {% endif %}
+            </div>
+
+            <div class="warning-box">
+                <p><strong>⚠️ Security Notice:</strong> Never share this code with anyone. FreeFace staff will never ask for your verification code.</p>
+            </div>
+
+            <div class="info-text">
+                <p><strong>What is this code for?</strong></p>
+                <p>{% if purpose_description %}{{ purpose_description }}{% else %}This code is required to verify your identity and complete your requested action.{% endif %}</p>
+
+                <p style="margin-top: 20px;"><strong>Didn't request this code?</strong></p>
+                <p>If you didn't request this verification code, please ignore this email or contact our support team if you're concerned about your account security.</p>
+            </div>
+        </div>
+        <div class="footer">
+            <p><strong>FreeFace</strong> - Connect. Explore. Belong.</p>
+            <p>This is an automated message, please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
